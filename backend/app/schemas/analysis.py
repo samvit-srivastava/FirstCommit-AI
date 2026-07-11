@@ -18,6 +18,14 @@ class RoadmapStep(BaseModel):
     title: str
     description: str
 
+class ImportantFileItem(BaseModel):
+    file: str
+    purpose: str
+
+class TopLevelFolderItem(BaseModel):
+    name: str
+    purpose: str
+
 class AnalyzeResponse(BaseModel):
     summary: str
     tech_stack: List[TechStackItem]
@@ -27,6 +35,13 @@ class AnalyzeResponse(BaseModel):
     default_branch: str
     local_clone_path: str
     clone_status: str
+    project_name: str
+    description: str
+    repository_type: str
+    detected_frameworks: List[str]
+    detected_languages: List[str]
+    important_files: List[ImportantFileItem]
+    top_level_folders: List[TopLevelFolderItem]
 
 class ChatRequest(BaseModel):
     repo_id: str

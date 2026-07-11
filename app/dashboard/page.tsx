@@ -91,7 +91,7 @@ export default function DashboardPage() {
     purpose: "Provide developers with an accelerated onboarding path to understand and contribute to the repository quickly.",
     architecture: `Standard structure on branch ${analysisResult.default_branch}. Cloned locally to ${analysisResult.local_clone_path}.`,
     stars: 0,
-    language: "Detected",
+    language: analysisResult.detected_languages?.[0] || "Unknown",
     url: `https://github.com/${analysisResult.repository_name}`
   };
 

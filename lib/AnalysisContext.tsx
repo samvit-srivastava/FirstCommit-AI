@@ -28,6 +28,13 @@ export interface BackendAnalysisResult {
   default_branch: string;
   local_clone_path: string;
   clone_status: string;
+  project_name: string;
+  description: string;
+  repository_type: string;
+  detected_frameworks: string[];
+  detected_languages: string[];
+  important_files: { file: string; purpose: string }[];
+  top_level_folders: { name: string; purpose: string }[];
 }
 
 interface AnalysisContextType {

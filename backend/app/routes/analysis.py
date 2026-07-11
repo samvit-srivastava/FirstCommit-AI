@@ -7,11 +7,14 @@ from app.schemas.analysis import (
     TechStackItem,
     FolderExplanationItem,
     RoadmapStep,
+    ImportantFileItem,
+    TopLevelFolderItem,
 )
-from app.services import RepositoryService
+from app.services import RepositoryService, ParserService
 
 router = APIRouter()
 repository_service = RepositoryService()
+parser_service = ParserService()
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_repository(payload: AnalyzeRequest):
@@ -22,63 +25,66 @@ async def analyze_repository(payload: AnalyzeRequest):
     """
     try:
         clone_info = repository_service.clone_repository(payload.repo_url)
+        parser_info = parser_service.parse_repository(clone_info["local_clone_path"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return AnalyzeResponse(
-        summary=(
-            "FirstCommit AI is a specialized onboarding assistant designed to help developers "
-            "understand any repository and make their first meaningful contribution in minutes. "
-            "It automatically parses repository structures, extracts technologies, and generates "
-            "interactive roadmaps using Gemini."
+    # Dynamically build tech_stack from detected frameworks and languages
+    tech_stack = []
+    for framework in parser_info["detected_frameworks"]:
+        category = "Frontend"
+        if framework in ("FastAPI", "Django", "Flask", "Express"):
+            category = "Backend"
+        elif framework in ("Vite", "Turbopack", "Webpack"):
+            category = "DevOps"
+        tech_stack.append(TechStackItem(name=framework, category=category, icon=framework.lower()))
+        
+    for language in parser_info["detected_languages"]:
+        tech_stack.append(TechStackItem(name=language, category="Language", icon=language.lower()))
+
+    # Dynamically list top-level folders with purpose "Unknown"
+    folder_explanation = [
+        FolderExplanationItem(path=folder["name"] + "/", purpose=folder["purpose"])
+        for folder in parser_info["top_level_folders"]
+    ]
+
+    # Generate a deterministic static roadmap based on the detected repository type
+    repo_type = parser_info["repository_type"]
+    roadmap = [
+        RoadmapStep(
+            step_number=1,
+            title="Read Project Documentation",
+            description=f"Start with README.md to understand the setup and design guidelines of this {repo_type}."
         ),
-        tech_stack=[
-            TechStackItem(name="Next.js", category="Frontend", icon="nextjs"),
-            TechStackItem(name="FastAPI", category="Backend", icon="fastapi"),
-            TechStackItem(name="Python", category="Language", icon="python"),
-            TechStackItem(name="TypeScript", category="Language", icon="typescript"),
-            TechStackItem(name="ChromaDB", category="Database", icon="chromadb")
-        ],
-        folder_explanation=[
-            FolderExplanationItem(
-                path="backend/",
-                purpose="FastAPI backend application including routers, schemas, and LLM orchestration logic."
-            ),
-            FolderExplanationItem(
-                path="frontend/",
-                purpose="Next.js frontend application containing user interfaces, dashboard, and interactive chatbot."
-            ),
-            FolderExplanationItem(
-                path="docs/",
-                purpose="Project documentation, architectural plans, and developer setup instructions."
-            )
-        ],
-        roadmap=[
-            RoadmapStep(
-                step_number=1,
-                title="Review Project Context",
-                description="Read TEAM_CONTEXT.md to align on the project scope, technical stack, and contribution workflow."
-            ),
-            RoadmapStep(
-                step_number=2,
-                title="Initialize Backend",
-                description="Navigate to the backend/ folder, install requirements, and run the FastAPI server locally."
-            ),
-            RoadmapStep(
-                step_number=3,
-                title="Explore the Codebase Structure",
-                description="Browse the schemas/ and routes/ directories to understand how the API contract is structured."
-            ),
-            RoadmapStep(
-                step_number=4,
-                title="Implement Feature",
-                description="Identify a feature on the roadmap or task list and implement it following modular code standards."
-            )
-        ],
+        RoadmapStep(
+            step_number=2,
+            title="Explore Configuration Files",
+            description="Examine package.json, requirements.txt, or other config files to understand the dependencies."
+        )
+    ]
+
+    return AnalyzeResponse(
+        summary=parser_info["description"],
+        tech_stack=tech_stack,
+        folder_explanation=folder_explanation,
+        roadmap=roadmap,
         repository_name=clone_info["repository_name"],
         default_branch=clone_info["default_branch"],
         local_clone_path=clone_info["local_clone_path"],
-        clone_status=clone_info["clone_status"]
+        clone_status=clone_info["clone_status"],
+        project_name=parser_info["project_name"],
+        description=parser_info["description"],
+        repository_type=repo_type,
+        detected_frameworks=parser_info["detected_frameworks"],
+        detected_languages=parser_info["detected_languages"],
+        important_files=[
+            ImportantFileItem(file=f["file"], purpose=f["purpose"])
+            for f in parser_info["important_files"]
+        ],
+        top_level_folders=[
+            TopLevelFolderItem(name=f["name"], purpose=f["purpose"])
+            for f in parser_info["top_level_folders"]
+        ]
     )
 
 @router.post("/chat", response_model=ChatResponse)
