@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.schemas.analysis import (
     AnalyzeRequest,
     AnalyzeResponse,
@@ -8,17 +8,23 @@ from app.schemas.analysis import (
     FolderExplanationItem,
     RoadmapStep,
 )
+from app.services import RepositoryService
 
 router = APIRouter()
+repository_service = RepositoryService()
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_repository(payload: AnalyzeRequest):
     """
-    Analyzes a GitHub repository URL and returns a summary, tech stack,
-    folder explanation, and onboarding roadmap.
-    Returns realistic mock data for this phase of the hackathon demo.
+    Analyzes a GitHub repository URL: validates and clones the repository,
+    and returns a summary, tech stack, folder explanation, onboarding roadmap,
+    and clone metadata.
     """
-    # TODO: Implement repository cloning, parsing, and LLM analysis in future phases.
+    try:
+        clone_info = repository_service.clone_repository(payload.repo_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     return AnalyzeResponse(
         summary=(
             "FirstCommit AI is a specialized onboarding assistant designed to help developers "
@@ -68,7 +74,11 @@ async def analyze_repository(payload: AnalyzeRequest):
                 title="Implement Feature",
                 description="Identify a feature on the roadmap or task list and implement it following modular code standards."
             )
-        ]
+        ],
+        repository_name=clone_info["repository_name"],
+        default_branch=clone_info["default_branch"],
+        local_clone_path=clone_info["local_clone_path"],
+        clone_status=clone_info["clone_status"]
     )
 
 @router.post("/chat", response_model=ChatResponse)

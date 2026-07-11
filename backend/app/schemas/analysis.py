@@ -23,6 +23,10 @@ class AnalyzeResponse(BaseModel):
     tech_stack: List[TechStackItem]
     folder_explanation: List[FolderExplanationItem]
     roadmap: List[RoadmapStep]
+    repository_name: str
+    default_branch: str
+    local_clone_path: str
+    clone_status: str
 
 class ChatRequest(BaseModel):
     repo_id: str
