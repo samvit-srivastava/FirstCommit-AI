@@ -3,11 +3,27 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { TopBar } from "@/components/dashboard/TopBar";
+import { usePathname, useRouter } from "next/navigation";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("overview");
+  const pathname = usePathname() ?? "/dashboard";
+  const router = useRouter();
+
+  // Derive activeSection from pathname
+  const activeSection = pathname === "/dashboard" 
+    ? "overview" 
+    : pathname.split("/").pop() ?? "overview";
+
+  const handleSectionChange = (section: string) => {
+    setMobileMenuOpen(false);
+    if (section === "overview") {
+      router.push("/dashboard");
+    } else {
+      router.push(`/dashboard/${section}`);
+    }
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -17,10 +33,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         mobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
         activeSection={activeSection}
-        onSectionChange={(section) => {
-          setActiveSection(section);
-          setMobileMenuOpen(false);
-        }}
+        onSectionChange={handleSectionChange}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
