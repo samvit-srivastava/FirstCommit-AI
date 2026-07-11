@@ -77,7 +77,7 @@ function SidebarContent({
               key={item.id}
               onClick={() => onSectionChange(item.id)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer",
                 collapsed && !isMobile ? "justify-center px-2" : "",
                 isActive
                   ? "bg-primary/10 text-primary"
@@ -97,7 +97,7 @@ function SidebarContent({
         <div className="border-t border-border/40 p-2">
           <button
             onClick={onToggleCollapse}
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground cursor-pointer"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (

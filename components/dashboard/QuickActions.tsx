@@ -19,21 +19,21 @@ const ACTIONS = [
     description: "Personalized onboarding steps",
     icon: Map,
     variant: "secondary" as const,
-    href: null,
+    href: "/dashboard/roadmap",
   },
   {
     label: "Ask a Question",
     description: "Chat with the repository AI",
     icon: MessageSquare,
     variant: "secondary" as const,
-    href: null,
+    href: "/dashboard/chat",
   },
   {
     label: "Explore Folders",
     description: "Browse the project structure",
     icon: FolderTree,
     variant: "secondary" as const,
-    href: null,
+    href: "/dashboard/folders",
   },
 ] as const;
 
