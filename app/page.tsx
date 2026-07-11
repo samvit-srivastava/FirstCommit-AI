@@ -1,10 +1,17 @@
+import { Hero } from "@/components/landing/Hero";
+import { UrlInput } from "@/components/landing/UrlInput";
+import { FeatureCards } from "@/components/landing/FeatureCards";
+import { Footer } from "@/components/landing/Footer";
+
 export default function LandingPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold gradient-text">FirstCommit AI</h1>
-      <p className="mt-4 text-muted-foreground">
-        Phase 1 setup complete. Landing page coming next.
-      </p>
-    </main>
+    <div className="flex min-h-screen flex-col">
+      <main className="flex-1">
+        <Hero />
+        <UrlInput />
+        <FeatureCards />
+      </main>
+      <Footer />
+    </div>
   );
 }
