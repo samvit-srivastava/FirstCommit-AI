@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { BookOpen, Star, Code2, Globe, Cpu, AlertCircle, Compass } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockAnalysis } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 
 const itemVariants = {
   hidden: { opacity: 0, y: 15 },
@@ -22,7 +22,25 @@ const containerVariants = {
 };
 
 export function ProjectSummaryView() {
-  const { summary } = mockAnalysis;
+  const { analysisResult } = useAnalysis();
+
+  if (!analysisResult) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No active repository details found. Please analyze a repository.
+      </div>
+    );
+  }
+
+  const summary = {
+    name: analysisResult.repository_name,
+    description: analysisResult.summary,
+    purpose: "Provide developers with an accelerated onboarding path to understand and contribute to the repository quickly.",
+    architecture: `Standard structure on branch ${analysisResult.default_branch}. Cloned locally to ${analysisResult.local_clone_path}.`,
+    stars: 0,
+    language: "Detected",
+    url: `https://github.com/${analysisResult.repository_name}`
+  };
 
   const insights = [
     {

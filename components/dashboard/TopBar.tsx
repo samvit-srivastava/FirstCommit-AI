@@ -9,7 +9,7 @@ import {
   Star,
   ChevronDown,
 } from "lucide-react";
-import { mockAnalysis } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -20,7 +20,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onMobileMenuToggle }: TopBarProps) {
-  const repo = mockAnalysis.summary;
+  const { analysisResult, repoUrl } = useAnalysis();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -28,6 +28,23 @@ export function TopBar({ onMobileMenuToggle }: TopBarProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
+
+  if (!analysisResult) {
+    return (
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/40 bg-card/30 px-4 backdrop-blur-sm sm:gap-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">FirstCommit AI</span>
+        </div>
+        <div className="flex-1" />
+      </header>
+    );
+  }
+
+  const repo = {
+    name: analysisResult.repository_name,
+    url: repoUrl || `https://github.com/${analysisResult.repository_name}`,
+    stars: 0,
+  };
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/40 bg-card/30 px-4 backdrop-blur-sm sm:gap-4 sm:px-6">

@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   ],
 };
 
+import { AnalysisProvider } from "@/lib/AnalysisContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -44,7 +46,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AnalysisProvider>
+            {children}
+          </AnalysisProvider>
         </ThemeProvider>
       </body>
     </html>
