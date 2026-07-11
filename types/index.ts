@@ -46,3 +46,16 @@ export interface AnalysisResult {
   folders: FolderItem[];
   roadmap: Record<DeveloperRole, RoadmapStep[]>;
 }
+
+export interface ActivityItem {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface OverviewStat {
+  label: string;
+  value: string;
+  description: string;
+}

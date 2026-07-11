@@ -1,4 +1,4 @@
-import type { AnalysisResult, ChatMessage } from "@/types";
+import type { AnalysisResult, ChatMessage, OverviewStat, ActivityItem } from "@/types";
 
 export const mockAnalysis: AnalysisResult = {
   summary: {
@@ -309,5 +309,67 @@ export const mockChatMessages: ChatMessage[] = [
       "packages/next/src/server/app-render/app-render.tsx",
       "packages/next/src/build/webpack/loaders/next-app-loader/index.ts",
     ],
+  },
+];
+
+export const mockOverviewStats: OverviewStat[] = [
+  {
+    label: "Technologies",
+    value: "12",
+    description: "Frameworks, languages, and tools detected",
+  },
+  {
+    label: "Folders Mapped",
+    value: "6",
+    description: "Top-level directories analyzed",
+  },
+  {
+    label: "Roadmap Steps",
+    value: "5",
+    description: "Personalized onboarding steps generated",
+  },
+  {
+    label: "GitHub Stars",
+    value: "128k",
+    description: "Community popularity score",
+  },
+];
+
+export const mockRecentActivity: ActivityItem[] = [
+  {
+    id: "a1",
+    title: "Repository cloned",
+    description: "vercel/next.js cloned and indexed successfully",
+    timestamp: "2 minutes ago",
+  },
+  {
+    id: "a2",
+    title: "Tech stack detected",
+    description: "12 technologies identified across the codebase",
+    timestamp: "2 minutes ago",
+  },
+  {
+    id: "a3",
+    title: "Folder structure mapped",
+    description: "6 top-level directories analyzed with AI explanations",
+    timestamp: "1 minute ago",
+  },
+  {
+    id: "a4",
+    title: "Onboarding roadmap generated",
+    description: "5-step personalized learning path created",
+    timestamp: "1 minute ago",
+  },
+  {
+    id: "a5",
+    title: "RAG index built",
+    description: "Repository embeddings generated for AI chat",
+    timestamp: "30 seconds ago",
+  },
+  {
+    id: "a6",
+    title: "Analysis complete",
+    description: "Repository is ready for exploration",
+    timestamp: "Just now",
   },
 ];
