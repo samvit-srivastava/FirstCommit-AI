@@ -6,7 +6,7 @@ import { Send, Bot, User, FileCode, Loader2, Sparkles } from "lucide-react";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { mockChatMessages } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import type { ChatMessage } from "@/types";
 
 const SUGGESTED_QUESTIONS = [
@@ -28,10 +28,24 @@ const MOCK_ANSWERS: Record<string, { content: string; files: string[] }> = {
 };
 
 export function AskRepoChatView() {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
+  const { analysisResult } = useAnalysis();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Set greeting when context loads
+  useEffect(() => {
+    if (analysisResult) {
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: `Hello! I have analyzed the repository "${analysisResult.repository_name}". Ask me anything about the codebase structures, API endpoints, configurations, or setup procedures!`,
+        }
+      ]);
+    }
+  }, [analysisResult]);
 
   // Auto scroll to bottom
   const scrollToBottom = () => {
@@ -47,7 +61,15 @@ export function AskRepoChatView() {
     scrollToBottom();
   }, [messages, isThinking]);
 
-  const handleSendMessage = (content: string) => {
+  if (!analysisResult) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No active repository details found. Please analyze a repository.
+      </div>
+    );
+  }
+
+  const handleSendMessage = async (content: string) => {
     if (!content.trim() || isThinking) return;
 
     const nextId = messages.length + 1;
@@ -61,23 +83,44 @@ export function AskRepoChatView() {
     setInputValue("");
     setIsThinking(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const matchedAnswer = MOCK_ANSWERS[content.trim()] ?? {
-        content: `I've analyzed the codebase context for your query. Regarding "${content}", Next.js addresses this through its modular compiler pipeline and app router engines. You can find related symbols inside the core packages directory. Let me know if you need specific function mappings!`,
-        files: ["packages/next/package.json"],
-      };
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${apiUrl}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repo_id: analysisResult.repository_name,
+          question: content.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get answer from server.");
+      }
+
+      const data = await response.json();
 
       const assistantMsg: ChatMessage = {
         id: `msg_assistant_${nextId + 1}`,
         role: "assistant",
-        content: matchedAnswer.content,
-        referencedFiles: matchedAnswer.files,
+        content: data.answer,
+        referencedFiles: data.referenced_files || [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (err: any) {
+      console.error(err);
+      const errorMsg: ChatMessage = {
+        id: `msg_assistant_${nextId + 1}`,
+        role: "assistant",
+        content: "Sorry, I encountered an error connecting to the backend. Please ensure the backend server is running.",
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsThinking(false);
-    }, 1200);
+    }
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -224,7 +267,7 @@ export function AskRepoChatView() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask a question about vercel/next.js…"
+              placeholder={`Ask a question about ${analysisResult.repository_name}...`}
               className="flex-1 bg-secondary/45 border border-border/30 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors"
               disabled={isThinking}
               aria-label="Repository chat message input"

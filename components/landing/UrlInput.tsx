@@ -21,11 +21,14 @@ function GitHubIcon({ className }: { className?: string }) {
 
 const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+/;
 
+import { useAnalysis } from "@/lib/AnalysisContext";
+
 export function UrlInput() {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { setAnalysis } = useAnalysis();
 
   function validate(value: string): boolean {
     if (!value.trim()) {
@@ -40,14 +43,37 @@ export function UrlInput() {
     return true;
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validate(url)) return;
 
     setIsLoading(true);
-    setTimeout(() => {
+    setError("");
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${apiUrl}/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ repo_url: url.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to analyze repository.");
+      }
+
+      const data = await response.json();
+      setAnalysis(data, url.trim());
       router.push("/dashboard");
-    }, 800);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "An error occurred while connecting to the backend.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (

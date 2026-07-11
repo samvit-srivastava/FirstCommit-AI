@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Code2, Layout, Server, Database, Hammer, Info, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockAnalysis } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 
 const CATEGORY_MAP = {
   frontend: { label: "Frontend", icon: Layout, color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
@@ -42,10 +42,23 @@ const itemVariants = {
 };
 
 export function TechStackView() {
-  const { techStack } = mockAnalysis;
+  const { analysisResult } = useAnalysis();
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
   const categories = ["all", ...Object.keys(CATEGORY_MAP)];
+
+  if (!analysisResult) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No active repository details found. Please analyze a repository.
+      </div>
+    );
+  }
+
+  const techStack = analysisResult.tech_stack.map((item) => ({
+    name: item.name,
+    category: (item.category.toLowerCase() as any) || "other",
+  }));
 
   const filteredTech = techStack.filter(
     (item) => activeCategory === "all" || item.category === activeCategory
@@ -93,7 +106,7 @@ export function TechStackView() {
       >
         <AnimatePresence mode="popLayout">
           {filteredTech.map((item) => {
-            const catConfig = CATEGORY_MAP[item.category];
+            const catConfig = CATEGORY_MAP[item.category as keyof typeof CATEGORY_MAP] || CATEGORY_MAP.other;
             const details = TECH_DETAILS[item.name] ?? {
               usage: 40,
               description: "Detected package dependency active in codebase.",

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Folder, FolderOpen, ChevronRight, ChevronDown, FolderTree, Info, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { mockAnalysis } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import type { FolderItem } from "@/types";
 
 // Helper to simulate mock file counts for aesthetics
@@ -24,12 +24,30 @@ const MOCK_FILE_COUNTS: Record<string, { files: number; size: string }> = {
 };
 
 export function FolderExplorerView() {
-  const { folders } = mockAnalysis;
-  const [selectedFolder, setSelectedFolder] = useState<FolderItem>(folders[0]);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
-    "packages/": true,
-    "test/": true,
-  });
+  const { analysisResult } = useAnalysis();
+  const [selectedFolder, setSelectedFolder] = useState<FolderItem | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+
+  const folders: FolderItem[] = (analysisResult?.folder_explanation || []).map((item) => ({
+    name: item.path.replace(/\/$/, ""),
+    path: item.path,
+    explanation: item.purpose,
+    children: []
+  }));
+
+  useEffect(() => {
+    if (folders && folders.length > 0 && !selectedFolder) {
+      setSelectedFolder(folders[0]);
+    }
+  }, [analysisResult, folders, selectedFolder]);
+
+  if (!analysisResult || folders.length === 0 || !selectedFolder) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No active repository details found. Please analyze a repository.
+      </div>
+    );
+  }
 
   const toggleExpand = (path: string) => {
     setExpandedFolders((prev) => ({ ...prev, [path]: !prev[path] }));

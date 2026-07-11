@@ -6,7 +6,7 @@ import { Map, FileCode, Check, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DEVELOPER_ROLES } from "@/lib/constants";
-import { mockAnalysis } from "@/lib/mock-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import type { DeveloperRole } from "@/types";
 
 const itemVariants = {
@@ -26,9 +26,8 @@ const containerVariants = {
 };
 
 export function OnboardingRoadmapView() {
-  const { roadmap } = mockAnalysis;
+  const { analysisResult } = useAnalysis();
   const [activeRole, setActiveRole] = useState<DeveloperRole>("frontend");
-  // Track completed step indexes for active role (1-based index)
   const [completedSteps, setCompletedSteps] = useState<Record<DeveloperRole, Record<number, boolean>>>({
     frontend: { 1: true },
     backend: {},
@@ -36,7 +35,20 @@ export function OnboardingRoadmapView() {
     opensource: {},
   });
 
-  const steps = roadmap[activeRole];
+  if (!analysisResult) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No active repository details found. Please analyze a repository.
+      </div>
+    );
+  }
+
+  const steps = analysisResult.roadmap.map((item) => ({
+    step: item.step_number,
+    title: item.title,
+    description: item.description,
+    files: []
+  }));
   const roleCompleted = completedSteps[activeRole] ?? {};
 
   const toggleStep = (stepNumber: number) => {
