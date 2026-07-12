@@ -2,8 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Folder, FolderOpen, ChevronRight, ChevronDown, Info, HelpCircle, Terminal, Cpu } from "lucide-react";
+import { 
+  Folder, 
+  FolderOpen, 
+  ChevronRight, 
+  ChevronDown, 
+  FolderTree, 
+  Info, 
+  HelpCircle,
+  Layout,
+  Server,
+  Hammer,
+  FileText,
+  CheckSquare,
+  Image,
+  FileCode
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAnalysisData } from "@/hooks/use-analysis-data";
 import type { FolderItem } from "@/types";
@@ -26,6 +42,28 @@ function TypingText({ text }: { text: string }) {
   if (text !== lastText) {
     setLastText(text);
     setDisplayedText("");
+  }
+
+  // Fallback to legacy format if folders array is empty but folder_explanation exists
+  if (folders.length === 0 && analysisResult?.folder_explanation) {
+    analysisResult.folder_explanation.forEach((item) => {
+      const cleanName = item.path.replace(/\/$/, "");
+      folders.push({
+        name: cleanName,
+        path: item.path,
+        category: "Unknown",
+        description: item.purpose,
+        contains: [],
+        importance: "Medium",
+        confidence: 100,
+        source: "template",
+        provider: null,
+        model: null,
+        files_count: 0,
+        size_bytes: 0,
+        children: []
+      });
+    });
   }
 
   useEffect(() => {
@@ -85,14 +123,19 @@ export function FolderExplorerView() {
       size: "128 KB",
       flow: ["Local Directory File", "Code configuration logic", "Diagnostic indexes"]
     };
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k)) ? Math.floor(Math.log(bytes) / Math.log(k)) : 0;
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   // Recursive Tree Node renderer
-  const renderTree = (item: FolderItem, depth = 0) => {
+  const renderTree = (item: RichFolderItem, depth = 0) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = !!expandedFolders[item.path];
     const isSelected = selectedFolder.path === item.path;
-    const stats = getStats(item.path);
 
     return (
       <div key={item.path} className="select-none font-mono">
@@ -166,8 +209,6 @@ export function FolderExplorerView() {
     );
   };
 
-  const selectedStats = getStats(selectedFolder.path);
-
   return (
     <div className="space-y-8 max-w-5xl mx-auto select-none">
       
@@ -219,6 +260,37 @@ export function FolderExplorerView() {
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground mt-0.5">
                 Contains {selectedStats.files} source files and configurations.
+                <span className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded shrink-0">
+                  {formatBytes(selectedFolder.size_bytes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5 text-primary" />
+                  {selectedFolder.name}
+                </CardTitle>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Importance Badge */}
+                  {selectedFolder.importance && (
+                    <Badge variant="outline" className={`text-[10px] font-semibold px-2 py-0 ${IMPORTANCE_COLOR[selectedFolder.importance] || IMPORTANCE_COLOR.Low}`}>
+                      {selectedFolder.importance} Priority
+                    </Badge>
+                  )}
+                  {/* Category Badge */}
+                  {selectedFolder.category && (() => {
+                    const catMeta = CATEGORY_META[selectedFolder.category] || CATEGORY_META.Unknown;
+                    const IconComponent = catMeta.icon;
+                    return (
+                      <Badge variant="outline" className={`text-[10px] font-semibold px-2 py-0 flex items-center gap-1 ${catMeta.color}`}>
+                        <IconComponent className="h-3 w-3" />
+                        {catMeta.label}
+                      </Badge>
+                    );
+                  })()}
+                </div>
+              </div>
+              <CardDescription className="text-xs text-muted-foreground mt-1">
+                Contains {selectedFolder.files_count} files in total.
               </CardDescription>
             </CardHeader>
 
@@ -227,32 +299,55 @@ export function FolderExplorerView() {
                 
                 {/* AI Explanation with typing effect */}
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Info className="h-3.5 w-3.5" />
-                    AI Purpose Mapping
-                  </h4>
-                  <div className="p-4 bg-secondary/15 rounded-xl border border-border/30">
-                    <TypingText text={selectedFolder.explanation} />
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Info className="h-3.5 w-3.5" />
+                      Repository Knowledge Analysis
+                    </h4>
+                    {selectedFolder.source && (() => {
+                      if (selectedFolder.source === "llm" && selectedFolder.provider && selectedFolder.model) {
+                        return (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border text-primary bg-primary/10 border-primary/20">
+                            {selectedFolder.provider} • {selectedFolder.model}
+                          </span>
+                        );
+                      } else if (selectedFolder.source === "llm" && selectedFolder.model) {
+                        return (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border text-primary bg-primary/10 border-primary/20">
+                            {selectedFolder.model}
+                          </span>
+                        );
+                      }
+                      const srcMeta = SOURCE_META[selectedFolder.source] || SOURCE_META.template;
+                      return (
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${srcMeta.color}`}>
+                          {srcMeta.label}
+                        </span>
+                      );
+                    })()}
                   </div>
+                  <p className="text-sm leading-relaxed text-foreground/90 bg-secondary/20 p-4 rounded-xl border border-border/20">
+                    {selectedFolder.description || "No description provided for this folder."}
+                  </p>
                 </div>
 
-                {/* Dynamic mini-architecture map */}
-                <div className="space-y-2.5">
-                  <h4 className="text-[10px] font-heading font-bold text-[#00FFC6] uppercase tracking-wider flex items-center gap-1.5">
-                    <Cpu className="h-3.5 w-3.5" />
-                    Interactive Directory Flow Architecture
-                  </h4>
-                  <div className="flex items-center gap-2.5 overflow-x-auto py-2">
-                    {selectedStats.flow.map((node, idx) => (
-                      <div key={node} className="flex items-center gap-2 shrink-0">
-                        <div className="px-3 py-1.5 rounded-lg border border-border bg-card/60 font-mono text-[10px] text-foreground font-bold">
-                          {node}
-                        </div>
-                        {idx < selectedStats.flow.length - 1 && (
-                          <span className="text-muted-foreground/40 font-mono text-xs">→</span>
-                        )}
-                      </div>
-                    ))}
+                {/* Real Repository Contents (Files) */}
+                {selectedFolder.contains && selectedFolder.contains.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <FileCode className="h-3.5 w-3.5" />
+                      Repository Contents (Files)
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedFolder.contains.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[11px] font-mono bg-secondary/50 text-foreground/80 px-2.5 py-1 rounded-md border border-border/40"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -263,7 +358,7 @@ export function FolderExplorerView() {
           {/* Footer prompt */}
           <div className="p-4 border-t border-border/20 bg-secondary/15 flex items-center gap-2 text-xs text-muted-foreground">
             <HelpCircle className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span>Select directories in the tree on the left to learn about their structure role.</span>
+            <span>Select folders in the tree on the left to learn about their structure and size metrics.</span>
           </div>
         </Card>
       </div>

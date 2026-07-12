@@ -43,6 +43,47 @@ class RepositoryService:
             
         return owner, repo_name
 
+    def _delete_dir_with_backoff(self, path: Path) -> None:
+        """
+        Deletes a directory recursively, clearing read-only attributes on Windows,
+        and using exponential backoff to handle temporary locks.
+        """
+        if not path.exists():
+            return
+
+        import time
+        import stat
+        import os
+
+        def remove_readonly(func, file_path, excinfo):
+            try:
+                os.chmod(file_path, stat.S_IWRITE)
+                func(file_path)
+            except Exception:
+                pass
+
+        backoffs = [0.1, 0.25, 0.5, 1.0, 2.0]
+        for delay in backoffs:
+            try:
+                shutil.rmtree(path, onerror=remove_readonly)
+            except Exception:
+                pass
+            if not path.exists():
+                return
+            time.sleep(delay)
+
+        # Final try
+        try:
+            shutil.rmtree(path, onerror=remove_readonly)
+        except Exception:
+            pass
+
+        if path.exists():
+            raise ValueError(
+                f"Failed to clear stale repository cache at {path} due to Windows file locks. "
+                "Please close any open files or editors inside the temp folder and try again."
+            )
+
     def clone_repository(self, repo_url: str) -> dict:
         """
         Validates the GitHub URL, checks if the repo is already cloned, and clones if not.
@@ -63,24 +104,56 @@ class RepositoryService:
             try:
                 # Test if it's a valid git repository
                 repo = git.Repo(local_clone_path)
+                # Compare remote HEAD commit SHA with cached clone to invalidate stale cache
                 try:
-                    default_branch = repo.active_branch.name
-                except TypeError:
-                    # Detached HEAD fallback
-                    default_branch = self._get_default_branch_from_remote_refs(repo)
+                    ls_output = repo.git.ls_remote(repo_url, "HEAD")
+                    if ls_output:
+                        remote_sha = ls_output.split()[0]
+                        local_sha = repo.head.commit.hexsha
+                        if local_sha != remote_sha:
+                            # Stale cache! Close repo first to release locks, then delete and force re-clone
+                            repo.close()
+                            self._delete_dir_with_backoff(local_clone_path)
+                            raise git.exc.InvalidGitRepositoryError("Local commit SHA is stale")
+                except git.exc.InvalidGitRepositoryError as e:
+                    raise e
+                except Exception:
+                    # Offline / network issues: fallback to reuse the cached repository
+                    pass
+                
+                # Recheck directory presence in case it was deleted above
+                if local_clone_path.exists():
+                    try:
+                        default_branch = repo.active_branch.name
+                    except TypeError:
+                        # Detached HEAD fallback
+                        default_branch = self._get_default_branch_from_remote_refs(repo)
                     
-                return {
-                    "repository_name": repo_name,
-                    "default_branch": default_branch,
-                    "local_clone_path": str(local_clone_path),
-                    "clone_status": "reused"
-                }
-            except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError):
-                # Directory exists but is not a valid git repo, clean it up and re-clone
-                shutil.rmtree(local_clone_path, ignore_errors=True)
+                    # Close repo handle to release file locks on Windows
+                    repo.close()
+                    
+                    return {
+                        "repository_name": repo_name,
+                        "default_branch": default_branch,
+                        "local_clone_path": str(local_clone_path),
+                        "clone_status": "reused"
+                    }
+            except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError) as e:
+                # Close repo if still open
+                try:
+                    repo.close()
+                except Exception:
+                    pass
+                # Directory exists but is not a valid git repo or was deleted due to stale commit, clean it up and re-clone
+                self._delete_dir_with_backoff(local_clone_path)
         
         # Ensure parent directory exists
         temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Defensive check: ensure the folder is completely gone before cloning
+        if local_clone_path.exists():
+            self._delete_dir_with_backoff(local_clone_path)
+        assert not local_clone_path.exists(), "Clone directory still exists after deletion attempt!"
         
         # 4. Clone repository using GitPython (shallow clone, depth=1)
         try:
@@ -89,6 +162,9 @@ class RepositoryService:
                 default_branch = repo.active_branch.name
             except TypeError:
                 default_branch = self._get_default_branch_from_remote_refs(repo)
+                
+            # Close repo handle to release file locks on Windows
+            repo.close()
                 
             return {
                 "repository_name": repo_name,
