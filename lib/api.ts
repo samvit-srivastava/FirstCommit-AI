@@ -24,11 +24,6 @@ export interface AnalyzeBackendResponse {
   updated_at?: string;
 }
 
-export interface ChatBackendResponse {
-  answer: string;
-  referenced_files: string[];
-}
-
 export function mapBackendResponseToResult(
   backend: AnalyzeBackendResponse,
   repoUrl: string
@@ -119,22 +114,3 @@ export async function analyzeRepository(repoUrl: string): Promise<AnalysisResult
   return mapBackendResponseToResult(data, repoUrl);
 }
 
-export async function chatWithRepository(
-  repoId: string,
-  question: string
-): Promise<ChatBackendResponse> {
-  const response = await fetch(`${API_BASE_URL}/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ repo_id: repoId, question }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to chat with repository.");
-  }
-
-  return response.json();
-}
