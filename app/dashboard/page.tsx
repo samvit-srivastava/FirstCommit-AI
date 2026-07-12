@@ -1,128 +1,177 @@
 "use client";
 
-import { useAnalysis } from "@/lib/AnalysisContext";
+import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RepoInfoPanel } from "@/components/dashboard/RepoInfoPanel";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { useAnalysisData } from "@/hooks/use-analysis-data";
+import { mockRecentActivity } from "@/lib/mock-data";
+import { soundManager } from "@/lib/sounds";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15, scale: 0.985, filter: "blur(4px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { type: "spring" as const, stiffness: 90, damping: 14 },
+  },
+};
 
 export default function DashboardPage() {
-  const { analysisResult, isLoading } = useAnalysis();
+  const { data, hasRealData } = useAnalysisData();
 
-  if (isLoading) {
-    return (
-      <div className="flex h-96 flex-col items-center justify-center gap-2">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading analysis details...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    soundManager.playSuccess();
+  }, []);
 
-  if (!analysisResult) {
-    return (
-      <div className="mx-auto max-w-md text-center py-16 space-y-6">
-        <h2 className="text-xl font-bold tracking-tight">No active repository</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          It looks like you haven't analyzed a repository yet. Please return to the home page and enter a GitHub repository URL.
-        </p>
-        <Link href="/" passHref legacyBehavior>
-          <Button className="gap-2 cursor-pointer">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Go to Landing Page</span>
-          </Button>
-        </Link>
-      </div>
-    );
-  }
+  // Extract owner from repository URL
+  const getOwner = (url: string) => {
+    if (!url) return "firstcommit";
+    const parts = url.split("/");
+    return parts[3] || "firstcommit";
+  };
 
-  // Map overview stats dynamically from analysisResult
-  const stats = [
+  // Dynamically derive overview stats from real data context
+  const overviewStats = [
     {
       label: "Technologies",
-      value: String(analysisResult.tech_stack.length),
-      description: "Frameworks, languages, and tools detected",
+      value: String(data.techStack.length),
+      description: "Languages and frameworks identified",
     },
     {
       label: "Folders Mapped",
-      value: String(analysisResult.folder_explanation.length),
-      description: "Top-level directories analyzed",
+      value: String(data.folders.length),
+      description: "Top-level directories explained",
     },
     {
       label: "Roadmap Steps",
-      value: String(analysisResult.roadmap.length),
-      description: "Personalized onboarding steps generated",
+      value: String(data.roadmap.frontend.length),
+      description: "Personalized onboarding tasks",
     },
     {
-      label: "Clone Status",
-      value: analysisResult.clone_status === "reused" ? "Reused" : "Cloned",
-      description: "Local checkout status of the repository",
+      label: "GitHub Stars",
+      value: data.summary.stars >= 1000
+        ? `${Math.round(data.summary.stars / 1000)}k`
+        : String(data.summary.stars),
+      description: "Codebase popularity score",
     },
   ];
 
-  // Map activities dynamically from analysisResult
-  const activities = [
-    {
-      id: "a1",
-      title: "Repository cloned",
-      description: `${analysisResult.repository_name} cloned locally to temp directory`,
-      timestamp: "Just now",
-    },
-    {
-      id: "a2",
-      title: "Tech stack detected",
-      description: `${analysisResult.tech_stack.length} technologies identified`,
-      timestamp: "Just now",
-    },
-    {
-      id: "a3",
-      title: "Folder structure mapped",
-      description: `${analysisResult.folder_explanation.length} primary directories analyzed`,
-      timestamp: "Just now",
-    },
-  ];
-
-  // Format ProjectSummary to fit UI props mapping
-  const mappedSummary = {
-    name: analysisResult.repository_name,
-    description: analysisResult.summary,
-    purpose: "Provide developers with an accelerated onboarding path to understand and contribute to the repository quickly.",
-    architecture: `Standard structure on branch ${analysisResult.default_branch}. Cloned locally to ${analysisResult.local_clone_path}.`,
-    stars: 0,
-    language: analysisResult.detected_languages?.[0] || "Unknown",
-    url: `https://github.com/${analysisResult.repository_name}`
-  };
+  // Dynamically configure activity items if using real backend data
+  const recentActivity = hasRealData
+    ? [
+        {
+          id: "a1",
+          title: "Repository cloned",
+          description: `${data.summary.name} cloned and indexed successfully`,
+          timestamp: "Just now",
+        },
+        {
+          id: "a2",
+          title: "Tech stack detected",
+          description: `${data.techStack.length} frameworks and languages identified`,
+          timestamp: "Just now",
+        },
+        {
+          id: "a3",
+          title: "Folder structure mapped",
+          description: `${data.folders.length} directories analyzed with AI explanations`,
+          timestamp: "Just now",
+        },
+        {
+          id: "a4",
+          title: "Analysis complete",
+          description: "Repository analysis is ready for exploration",
+          timestamp: "Just now",
+        },
+      ]
+    : mockRecentActivity;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Analysis overview for{" "}
-          <span className="font-semibold text-foreground">
-            {analysisResult.repository_name}
-          </span>
-        </p>
-      </div>
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="mx-auto max-w-7xl space-y-8 select-none font-sans"
+    >
+      {/* 1. Cinematic Staggered Compact Hero Panel */}
+      <motion.div 
+        variants={itemVariants}
+        className="border border-white/10 bg-white/[0.02] backdrop-blur-md shadow-2xl px-6 py-4.5 rounded-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
+        <div className="absolute top-0 left-0 h-[1px] w-full bg-[linear-gradient(90deg,transparent,#7C5CFF,#00D4FF,transparent)] opacity-40" />
+        
+        <div>
+          <h1 className="text-xl font-heading font-black tracking-tight text-foreground">
+            Repository Intelligence
+          </h1>
+          <p className="text-xs text-muted-foreground/50 mt-0.5 leading-relaxed font-medium">
+            Analyze, understand and navigate your codebase with AI.
+          </p>
+        </div>
 
-      {/* Overview stat cards */}
-      <OverviewCards stats={stats} />
+        {/* Telemetry bar */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] text-muted-foreground/40 font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">REPOSITORY:</span>
+            <span className="text-foreground font-bold">{data.summary.name}</span>
+          </div>
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">OWNER:</span>
+            <span className="text-[#00D4FF] font-bold">{getOwner(data.summary.url)}</span>
+          </div>
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">ANALYZED:</span>
+            <span className="text-foreground font-bold">JUST NOW</span>
+          </div>
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[8px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#00FFC6] animate-pulse" />
+              AI ACTIVE
+            </span>
+          </div>
+        </div>
+      </motion.div>
 
-      {/* Two-column layout: activity + actions on left, repo info on right */}
+      {/* 2. Overview Stats (Redesigned Glass Tiles) */}
+      <motion.div variants={itemVariants}>
+        <OverviewCards stats={overviewStats} />
+      </motion.div>
+
+      {/* 3. Details Split layout (Timeline, Action center, Info Panel) */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <RecentActivity activities={activities} />
-          <QuickActions />
+          <motion.div variants={itemVariants}>
+            <RecentActivity activities={recentActivity} />
+          </motion.div>
+          
+          <motion.div variants={itemVariants}>
+            <QuickActions />
+          </motion.div>
         </div>
-        <div>
-          <RepoInfoPanel summary={mappedSummary} />
-        </div>
+        
+        <motion.div variants={itemVariants}>
+          <RepoInfoPanel summary={data.summary} />
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
