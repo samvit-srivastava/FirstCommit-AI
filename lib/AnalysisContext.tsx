@@ -63,6 +63,10 @@ export interface BackendAnalysisResult {
   technologies: DetailedTechItem[];
   folders: DetailedFolderItem[];
   readme: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  updated_at: string;
 }
 
 interface AnalysisContextType {

@@ -98,7 +98,7 @@ export function RepoInfoPanel({ summary }: RepoInfoPanelProps) {
               <InfoRow
                 icon={GitBranch}
                 label="Branch"
-                value={<span className="text-foreground font-bold">main</span>}
+                value={<span className="text-foreground font-bold">{summary.default_branch || "main"}</span>}
               />
               <InfoRow
                 icon={Star}
@@ -106,11 +106,25 @@ export function RepoInfoPanel({ summary }: RepoInfoPanelProps) {
                 value={
                   <span className="text-foreground font-bold">
                     {summary.stars >= 1000
-                      ? `${Math.round(summary.stars / 1000)}k`
+                      ? `${(summary.stars / 1000).toFixed(1)}k`
                       : summary.stars}
                   </span>
                 }
               />
+              {summary.forks !== undefined && summary.forks > 0 && (
+                <InfoRow
+                  icon={GitBranch}
+                  label="Forks"
+                  value={<span className="text-foreground font-bold">{summary.forks}</span>}
+                />
+              )}
+              {summary.watchers !== undefined && summary.watchers > 0 && (
+                <InfoRow
+                  icon={Globe}
+                  label="Watchers"
+                  value={<span className="text-foreground font-bold">{summary.watchers}</span>}
+                />
+              )}
               <InfoRow
                 icon={Code2}
                 label="Language"
@@ -124,8 +138,12 @@ export function RepoInfoPanel({ summary }: RepoInfoPanelProps) {
               />
               <InfoRow
                 icon={Clock}
-                label="Analyzed"
-                value={<span className="text-foreground font-bold">Just now</span>}
+                label="Updated"
+                value={
+                  <span className="text-foreground font-bold">
+                    {summary.updated_at ? new Date(summary.updated_at).toLocaleDateString() : "Just now"}
+                  </span>
+                }
               />
             </div>
           </CardContent>

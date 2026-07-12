@@ -11,6 +11,7 @@ from app.schemas.analysis import (
     TopLevelFolderItem,
     DetailedTechItem,
     FolderExplanationRichItem,
+    GraphResponse,
 )
 from app.services import (
     RepositoryService,
@@ -50,6 +51,9 @@ async def analyze_repository(payload: AnalyzeRequest):
             repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], f["name"], tech_names)
             for f in parser_info["top_level_folders"]
         ]
+        
+        # Fetch live GitHub API metadata
+        github_meta = repository_service.get_github_metadata(payload.repo_url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -85,17 +89,20 @@ async def analyze_repository(payload: AnalyzeRequest):
         )
     ]
 
+    desc = github_meta["description"] if github_meta["description"] else parser_info["description"]
+    branch = github_meta["default_branch"] if github_meta["default_branch"] else clone_info["default_branch"]
+
     return AnalyzeResponse(
-        summary=parser_info["description"],
+        summary=desc,
         tech_stack=tech_stack,
         folder_explanation=folder_explanation,
         roadmap=roadmap,
         repository_name=clone_info["repository_name"],
-        default_branch=clone_info["default_branch"],
+        default_branch=branch,
         local_clone_path=clone_info["local_clone_path"],
         clone_status=clone_info["clone_status"],
         project_name=parser_info["project_name"],
-        description=parser_info["description"],
+        description=desc,
         repository_type=repo_type,
         detected_frameworks=parser_info["detected_frameworks"],
         detected_languages=parser_info["detected_languages"],
@@ -136,7 +143,11 @@ async def analyze_repository(payload: AnalyzeRequest):
             )
             for f in rich_folders
         ],
-        readme=parser_info.get("readme", "")
+        readme=parser_info.get("readme", ""),
+        stars=github_meta["stars"],
+        forks=github_meta["forks"],
+        watchers=github_meta["watchers"],
+        updated_at=github_meta["updated_at"]
     )
 
 @router.post("/chat", response_model=ChatResponse)
@@ -158,3 +169,44 @@ async def chat_with_repository(payload: ChatRequest):
             "backend/app/routes/analysis.py"
         ]
     )
+
+@router.get("/graph", response_model=GraphResponse)
+async def get_repository_graph(repo_url: str):
+    """
+    Exposes the unified knowledge graph and brain summary for a repository.
+    Reads directly from the cached engine index.
+    """
+    try:
+        # Resolve target clone path based on the validated URL
+        owner, repo_name = repository_service._validate_and_parse_url(repo_url)
+        import tempfile
+        from pathlib import Path
+        temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
+        local_clone_path = temp_dir / f"{owner}_{repo_name}"
+        
+        if not local_clone_path.exists():
+            raise HTTPException(status_code=404, detail="Repository must be analyzed first before querying its graph.")
+            
+        rke_index = repository_knowledge_engine.get_index(str(local_clone_path))
+        return GraphResponse(
+            repository=rke_index["repository"],
+            generated_at=rke_index["generated_at"],
+            graph={
+                "nodes": rke_index["graph"]["nodes"],
+                "edges": rke_index["graph"]["edges"],
+                "adjacency_map": rke_index["graph"]["adjacency_map"]
+            },
+            brain={
+                "languages": rke_index["brain"]["languages"],
+                "frameworks": rke_index["brain"]["frameworks"],
+                "entry_points": rke_index["brain"]["entry_points"],
+                "largest_folder": rke_index["brain"]["largest_folder"],
+                "top_symbols": rke_index["brain"]["top_symbols"],
+                "most_imported_module": rke_index["brain"]["most_imported_module"]
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve graph index: {str(e)}")
+

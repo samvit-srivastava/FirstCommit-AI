@@ -355,8 +355,18 @@ class RepositoryKnowledgeEngine:
             return ""
 
     def _is_typescript_installed(self, root_path: Path) -> bool:
+        # Check local node_modules in the repo itself
         ts_dir = root_path / "node_modules" / "typescript"
-        return ts_dir.exists() and ts_dir.is_dir()
+        if ts_dir.exists() and ts_dir.is_dir():
+            return True
+        # Fallback: check workspace parent directories (contains node_modules in the app root)
+        parent = Path(__file__).parent.resolve()
+        for _ in range(5):
+            parent_ts_dir = parent / "node_modules" / "typescript"
+            if parent_ts_dir.exists() and parent_ts_dir.is_dir():
+                return True
+            parent = parent.parent
+        return False
 
     def get_index(self, local_path: str) -> Dict[str, Any]:
         """
@@ -442,6 +452,9 @@ class RepositoryKnowledgeEngine:
             ir_result = self._parse_file_ir(Path(abs_path), meta["language"], use_ts_ast, ts_parser_path)
             index["files"][rel_path]["symbols"] = ir_result["symbols"]
             index["files"][rel_path]["imports"] = ir_result["imports"]
+            index["files"][rel_path]["calls"] = ir_result["calls"]
+            index["files"][rel_path]["components"] = ir_result["components"]
+            index["files"][rel_path]["routes"] = ir_result["routes"]
 
         # 4. Building the Unified Knowledge Graph (Step 5)
         nodes = []
@@ -457,6 +470,36 @@ class RepositoryKnowledgeEngine:
             "type": "Repository",
             "location": ""
         })
+
+        # Helper to find a symbol UUID in a file
+        def find_symbol_uuid(name: str, rel_path: str) -> Optional[str]:
+            f_meta = index["files"].get(rel_path)
+            if not f_meta:
+                return None
+            for s in f_meta.get("symbols", []):
+                if s["name"] == name:
+                    return str(uuid.uuid5(RKE_NAMESPACE, f"symbol:{repo_name}:{rel_path}:{name}"))
+            return None
+
+        # Helper to resolve imported or local symbol UUIDs
+        def resolve_symbol_uuid(symbol_name: str, caller_rel: str) -> str:
+            # 1. Check local file symbols
+            local_uuid = find_symbol_uuid(symbol_name, caller_rel)
+            if local_uuid:
+                return local_uuid
+            
+            # 2. Check imports
+            f_meta = index["files"].get(caller_rel)
+            if f_meta:
+                for imp in f_meta.get("imports", []):
+                    resolved_rel = self._resolve_relative_path(caller_rel, imp, index["files"])
+                    if resolved_rel:
+                        target_uuid = find_symbol_uuid(symbol_name, resolved_rel)
+                        if target_uuid:
+                            return target_uuid
+            
+            # 3. Fallback: file node UUID
+            return str(uuid.uuid5(RKE_NAMESPACE, f"file:{repo_name}:{caller_rel}"))
 
         for rel_path, file_meta in index["files"].items():
             file_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"file:{repo_name}:{rel_path}"))
@@ -475,10 +518,15 @@ class RepositoryKnowledgeEngine:
             })
 
             # Link file to repo
+            edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{repo_uuid}:{file_uuid}:contains:0"))
             edges.append({
+                "id": edge_uuid,
                 "source": repo_uuid,
                 "target": file_uuid,
-                "relation": "contains"
+                "relation": "contains",
+                "file_path": rel_path,
+                "language": file_meta["language"],
+                "line_number": 0
             })
 
             # Process folder nodes
@@ -494,15 +542,44 @@ class RepositoryKnowledgeEngine:
                         "type": "Folder",
                         "location": dir_rel
                     })
+                    
+                    # Link folder to repo
+                    folder_edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{repo_uuid}:{f_uuid}:contains:0"))
+                    edges.append({
+                        "id": folder_edge_uuid,
+                        "source": repo_uuid,
+                        "target": f_uuid,
+                        "relation": "contains",
+                        "file_path": dir_rel,
+                        "language": "Folder",
+                        "line_number": 0
+                    })
                 curr_dir = curr_dir.parent
 
             # Link file to folder
             if parent_dir:
                 parent_fld_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"folder:{repo_name}:{parent_dir}"))
+                edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{file_uuid}:{parent_fld_uuid}:belongs_to:0"))
                 edges.append({
+                    "id": edge_uuid,
+                    "source": file_uuid,
+                    "target": parent_fld_uuid,
+                    "relation": "belongs_to",
+                    "file_path": rel_path,
+                    "language": file_meta["language"],
+                    "line_number": 0
+                })
+                
+                # Bi-directional contains link
+                edge_contains_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{parent_fld_uuid}:{file_uuid}:contains:0"))
+                edges.append({
+                    "id": edge_contains_uuid,
                     "source": parent_fld_uuid,
                     "target": file_uuid,
-                    "relation": "belongs_to"
+                    "relation": "contains",
+                    "file_path": rel_path,
+                    "language": file_meta["language"],
+                    "line_number": 0
                 })
 
             # Process Symbols (Step 4)
@@ -519,10 +596,16 @@ class RepositoryKnowledgeEngine:
                 })
 
                 # Link symbol to file
+                edge_relation = "exports" if sym.get("exported", False) else "defines"
+                edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{file_uuid}:{sym_uuid}:{edge_relation}:0"))
                 edges.append({
+                    "id": edge_uuid,
                     "source": file_uuid,
                     "target": sym_uuid,
-                    "relation": "exports" if sym.get("exported", False) else "defines"
+                    "relation": edge_relation,
+                    "file_path": rel_path,
+                    "language": file_meta["language"],
+                    "line_number": sym["startLine"]
                 })
 
             # Process file imports
@@ -531,10 +614,136 @@ class RepositoryKnowledgeEngine:
                 resolved_rel = self._resolve_relative_path(rel_path, imp, index["files"])
                 if resolved_rel:
                     target_file_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"file:{repo_name}:{resolved_rel}"))
+                    edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{file_uuid}:{target_file_uuid}:imports:0"))
                     edges.append({
+                        "id": edge_uuid,
                         "source": file_uuid,
                         "target": target_file_uuid,
-                        "relation": "imports"
+                        "relation": "imports",
+                        "file_path": rel_path,
+                        "language": file_meta["language"],
+                        "line_number": 0
+                    })
+
+            # 5. Extract Call Graph Edges (caller -> callee)
+            for call in file_meta.get("calls", []):
+                caller_uuid = file_uuid
+                if call["caller"] != "global":
+                    caller_uuid = resolve_symbol_uuid(call["caller"], rel_path)
+                callee_uuid = resolve_symbol_uuid(call["callee"], rel_path)
+                
+                edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{caller_uuid}:{callee_uuid}:calls:{call['line']}"))
+                edges.append({
+                    "id": edge_uuid,
+                    "source": caller_uuid,
+                    "target": callee_uuid,
+                    "relation": "calls",
+                    "file_path": rel_path,
+                    "language": file_meta["language"],
+                    "line_number": call["line"]
+                })
+
+            # 6. Extract React Component Render Edges (parent -> child)
+            for comp in file_meta.get("components", []):
+                parent_uuid = file_uuid
+                if comp["parent"]:
+                    parent_uuid = resolve_symbol_uuid(comp["parent"], rel_path)
+                
+                # Resolve child component symbol
+                child_uuid = find_symbol_uuid(comp["name"], rel_path)
+                if not child_uuid:
+                    # Check imports
+                    for imp in file_meta.get("imports", []):
+                        resolved_rel = self._resolve_relative_path(rel_path, imp, index["files"])
+                        if resolved_rel:
+                            child_uuid = find_symbol_uuid(comp["name"], resolved_rel)
+                            if child_uuid:
+                                break
+                if not child_uuid:
+                    # External or unmapped React component node
+                    child_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"symbol:{repo_name}:external:{comp['name']}"))
+                    # Register external component node dynamically
+                    nodes.append({
+                        "id": child_uuid,
+                        "name": comp["name"],
+                        "type": "Component",
+                        "language": "TypeScript",
+                        "location": f"external/{comp['name']}"
+                    })
+
+                edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{parent_uuid}:{child_uuid}:renders:{comp['line']}"))
+                edges.append({
+                    "id": edge_uuid,
+                    "source": parent_uuid,
+                    "target": child_uuid,
+                    "relation": "renders",
+                    "file_path": rel_path,
+                    "language": file_meta["language"],
+                    "line_number": comp["line"]
+                })
+
+            # 7. Extract Custom Route Handlers mapping
+            for route in file_meta.get("routes", []):
+                route_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"route:{repo_name}:{route['method']}:{route['path']}"))
+                
+                # Register Route Node dynamically
+                nodes.append({
+                    "id": route_uuid,
+                    "name": f"{route['method'].upper()} {route['path']}",
+                    "type": "Route",
+                    "location": f"{rel_path}#L{route['line']}"
+                })
+
+                # Connect Route to handlers
+                for h in route["handlers"]:
+                    handler_uuid = resolve_symbol_uuid(h, rel_path)
+                    edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{route_uuid}:{handler_uuid}:handled_by:{route['line']}"))
+                    edges.append({
+                        "id": edge_uuid,
+                        "source": route_uuid,
+                        "target": handler_uuid,
+                        "relation": "handled_by",
+                        "file_path": rel_path,
+                        "language": file_meta["language"],
+                        "line_number": route["line"]
+                    })
+
+            # 8. Next.js App Router routing folder conventions
+            if rel_path.startswith("app/") and (rel_path.endswith("/page.tsx") or rel_path.endswith("/route.ts") or rel_path == "app/page.tsx" or rel_path == "app/route.ts"):
+                parts = rel_path.split("/")
+                url_parts = []
+                for p in parts[1:-1]:
+                    if not (p.startswith("(") and p.endswith(")")):
+                        url_parts.append(p)
+                url_path = "/" + "/".join(url_parts)
+                url_path = url_path.replace("//", "/")
+                
+                methods = ["GET"]
+                if rel_path.endswith("/route.ts"):
+                    route_symbols = [s["name"] for s in file_meta.get("symbols", [])]
+                    methods = [m for m in ("GET", "POST", "PUT", "DELETE", "PATCH") if m in route_symbols]
+                    if not methods:
+                        methods = ["GET"]
+
+                for method in methods:
+                    route_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"route:{repo_name}:{method.lower()}:{url_path}"))
+                    
+                    nodes.append({
+                        "id": route_uuid,
+                        "name": f"{method} {url_path}",
+                        "type": "Route",
+                        "location": rel_path
+                    })
+                    
+                    edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{route_uuid}:{file_uuid}:handled_by:0"))
+                    edges.append({
+                        "id": edge_uuid,
+                        "source": route_uuid,
+                        "target": file_uuid,
+                        "relation": "handled_by",
+                        "file_path": rel_path,
+                        "language": file_meta["language"],
+                        "line_number": 0
                     })
 
         # Add Folder Hierarchy Edges
@@ -545,17 +754,152 @@ class RepositoryKnowledgeEngine:
             
             if f_parent != ".":
                 parent_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"folder:{repo_name}:{f_parent}"))
+                edge_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"edge:{parent_uuid}:{fld_uuid}:contains:0"))
                 edges.append({
+                    "id": edge_uuid,
                     "source": parent_uuid,
                     "target": fld_uuid,
-                    "relation": "contains"
+                    "relation": "contains",
+                    "file_path": fld,
+                    "language": "Folder",
+                    "line_number": 0
                 })
 
-        # Format and save cache
+        # Deduplicate nodes by ID
+        unique_nodes = {}
+        for n in nodes:
+            unique_nodes[n["id"]] = n
+        nodes = list(unique_nodes.values())
+
+        # Deduplicate edges by ID
+        unique_edges = {}
+        for e in edges:
+            unique_edges[e["id"]] = e
+        edges = list(unique_edges.values())
+
+        # 9. Simple deterministic Importance Score calculation (out-degree/in-degree degree score)
+        in_degree = {}
+        out_degree = {}
+        for edge in edges:
+            src = edge["source"]
+            tgt = edge["target"]
+            out_degree[src] = out_degree.get(src, 0) + 1
+            in_degree[tgt] = in_degree.get(tgt, 0) + 1
+
+        for n in nodes:
+            nid = n["id"]
+            in_d = in_degree.get(nid, 0)
+            out_d = out_degree.get(nid, 0)
+            base_score = 1.0 + (in_d * 0.85) + (out_d * 0.15)
+            
+            # Apply architectural weights to prioritize components, classes, and routes
+            weight = 1.0
+            ntype = n.get("type", "")
+            nname = n.get("name", "")
+            
+            # Identify generic UI primitives to de-prioritize
+            generic_ui_primitives = {
+                "Card", "CardHeader", "CardTitle", "CardContent", "CardFooter",
+                "Button", "Input", "Badge", "Skeleton", "Avatar", "Separator", 
+                "Tabs", "Dialog", "DropdownMenu", "Tooltip", "Label", "Popover",
+                "Textarea", "Select", "Switch", "ScrollArea", "RadioGroup"
+            }
+            
+            if nname in generic_ui_primitives:
+                weight = 0.2
+            elif ntype in ("Component", "Class", "Route"):
+                weight = 2.5
+                # Boost major architectural symbols
+                if "Service" in nname or "Controller" in nname or "API" in nname or "Page" in nname or "Layout" in nname or "Context" in nname or "Provider" in nname or "Repository" in nname:
+                    weight *= 3.0
+            elif ntype in ("Hook", "Interface", "Type"):
+                weight = 1.8
+                if "Context" in nname or "use" in nname:
+                    weight *= 1.5
+            elif ntype == "File":
+                weight = 1.2
+                if nname.endswith("page.tsx") or nname.endswith("layout.tsx") or nname.endswith("route.ts") or nname in ("main.py", "server.js", "app.js"):
+                    weight *= 2.0
+                
+            # Demote helper functions, private methods, and utility functions
+            if nname.startswith("_") or nname in ("cn", "logger", "log", "format", "parse", "resolve", "utils", "helper", "get_index", "ts_parser"):
+                weight *= 0.1
+
+            # Check exports edge relation
+            is_exported = False
+            for edge in edges:
+                if edge["target"] == nid and edge["relation"] == "exports":
+                    is_exported = True
+                    break
+            if is_exported:
+                weight *= 1.5
+            else:
+                if ntype in ("Function", "Constant"):
+                    weight *= 0.6
+            
+            n["importance_score"] = round(base_score * weight, 3)
+
+        # 10. Store adjacency map (Step 5 adj map cache check)
+        adjacency_map = { n["id"]: [] for n in nodes }
+        for edge in edges:
+            src = edge["source"]
+            tgt = edge["target"]
+            if src in adjacency_map and tgt not in adjacency_map[src]:
+                adjacency_map[src].append(tgt)
+
         index["graph"]["nodes"] = nodes
         index["graph"]["edges"] = edges
+        index["graph"]["adjacency_map"] = adjacency_map
         index["languages"] = sorted(list(detected_langs))
         index["generated_at"] = str(Path(local_path).stat().st_mtime)
+
+        # 11. Deterministic evidence-only repository brain summary
+        detected_frameworks = []
+        try:
+            from app.services.tech_detector_service import TechDetectorService
+            detected_tech = TechDetectorService().detect_technologies(local_path)
+            detected_frameworks = [t["display_name"] for t in detected_tech if t["category"] in ("Frontend", "Backend")]
+        except Exception:
+            pass
+
+        entry_points = []
+        for filename in ("main.py", "server.js", "app/page.tsx", "index.js", "index.ts", "app.js"):
+            if (Path(local_path) / filename).exists():
+                entry_points.append(filename)
+
+        largest_folder = "root"
+        largest_size = 0
+        for fld in all_folders:
+            fld_size = sum(f_meta.get("size", 0) for r_p, f_meta in index["files"].items() if r_p.startswith(fld + "/"))
+            if fld_size > largest_size:
+                largest_size = fld_size
+                largest_folder = fld
+
+        import_counts = {}
+        for edge in edges:
+            if edge["relation"] == "imports":
+                import_counts[edge["target"]] = import_counts.get(edge["target"], 0) + 1
+        
+        most_imported_module = "None"
+        if import_counts:
+            most_imported_uuid = max(import_counts, key=import_counts.get)
+            for n in nodes:
+                if n["id"] == most_imported_uuid:
+                    most_imported_module = n["name"]
+                    break
+
+        symbols_nodes = [n for n in nodes if n["type"] in ("Class", "Function", "Component", "Hook", "Route")]
+        symbols_nodes.sort(key=lambda x: x.get("importance_score", 1.0), reverse=True)
+        top_symbols = [n["name"] for n in symbols_nodes[:5]]
+
+        index["brain"] = {
+            "languages": index["languages"],
+            "frameworks": detected_frameworks,
+            "entry_points": entry_points,
+            "largest_folder": largest_folder,
+            "top_symbols": top_symbols,
+            "most_imported_module": most_imported_module
+        }
 
         self._save_index(cache_path, index)
         return index
@@ -573,9 +917,26 @@ class RepositoryKnowledgeEngine:
             cache_path.write_text(json.dumps(index, indent=2), encoding="utf-8")
         except Exception:
             pass
-
     def _resolve_relative_path(self, current_file: str, import_path: str, files_index: Dict[str, Any]) -> Optional[str]:
         if not import_path.startswith("."):
+            # Strip Next.js path aliases
+            import_clean = import_path.replace("\\", "/")
+            if import_clean.startswith("@/"):
+                import_clean = import_clean[2:]
+            elif import_clean.startswith("~/"):
+                import_clean = import_clean[2:]
+                
+            prefixes = ["", "src/", "app/"]
+            for pref in prefixes:
+                path_candidate = f"{pref}{import_clean}".replace("//", "/")
+                for ext in (".py", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.py"):
+                    test_path = f"{path_candidate}{ext}"
+                    if test_path in files_index:
+                        return test_path
+                    # Scan keys in files_index to resolve target module path
+                    for k in files_index.keys():
+                        if k.endswith("/" + test_path) or k == test_path:
+                            return k
             return None
         import_clean = import_path.replace("\\", "/")
         parts = import_clean.split("/")
@@ -605,6 +966,9 @@ class RepositoryKnowledgeEngine:
         """
         symbols = []
         imports = []
+        calls = []
+        components = []
+        routes = []
 
         # 1. TS/JS AST
         if language in ("TypeScript", "JavaScript") and use_ts_ast and ts_parser_path.exists():
@@ -619,7 +983,10 @@ class RepositoryKnowledgeEngine:
                     data = json.loads(proc.stdout.strip())
                     return {
                         "symbols": data.get("symbols", []),
-                        "imports": data.get("imports", [])
+                        "imports": data.get("imports", []),
+                        "calls": data.get("calls", []),
+                        "components": data.get("components", []),
+                        "routes": data.get("routes", [])
                     }
             except Exception:
                 pass
@@ -631,30 +998,124 @@ class RepositoryKnowledgeEngine:
                 code = file_path.read_text(encoding="utf-8", errors="ignore")
                 tree = ast.parse(code, filename=str(file_path))
                 
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
+                class PythonIRVisitor(ast.NodeVisitor):
+                    def __init__(self):
+                        self.imports = []
+                        self.symbols = []
+                        self.calls = []
+                        self.routes = []
+                        self.current_caller_stack = []
+
+                    def visit_Import(self, node):
                         for name in node.names:
-                            imports.append(name.name)
-                    elif isinstance(node, ast.ImportFrom):
+                            self.imports.append(name.name)
+                        self.generic_visit(node)
+
+                    def visit_ImportFrom(self, node):
                         if node.module:
-                            imports.append(node.module)
-                    elif isinstance(node, ast.ClassDef):
-                        symbols.append({
+                            self.imports.append(node.module)
+                        self.generic_visit(node)
+
+                    def visit_ClassDef(self, node):
+                        self.symbols.append({
                             "name": node.name,
                             "type": "Class",
                             "startLine": node.lineno,
                             "endLine": getattr(node, "end_lineno", node.lineno),
                             "exported": True
                         })
-                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        symbols.append({
+                        self.current_caller_stack.append(node.name)
+                        self.generic_visit(node)
+                        self.current_caller_stack.pop()
+
+                    def visit_FunctionDef(self, node):
+                        self.symbols.append({
                             "name": node.name,
                             "type": "Function",
                             "startLine": node.lineno,
                             "endLine": getattr(node, "end_lineno", node.lineno),
                             "exported": True
                         })
-                return {"symbols": symbols, "imports": imports}
+                        self.current_caller_stack.append(node.name)
+                        
+                        # FastAPI/Django route decorators
+                        for dec in node.decorator_list:
+                            if isinstance(dec, ast.Call):
+                                dec_func = dec.func
+                                method = None
+                                if isinstance(dec_func, ast.Attribute) and isinstance(dec_func.value, ast.Name):
+                                    if dec_func.value.id in ("app", "router"):
+                                        method = dec_func.attr
+                                if method in ("get", "post", "put", "delete", "patch", "use") and dec.args:
+                                    first_arg = dec.args[0]
+                                    path_str = None
+                                    if isinstance(first_arg, ast.Constant):
+                                        path_str = str(first_arg.value)
+                                    elif isinstance(first_arg, ast.Str):
+                                        path_str = first_arg.s
+                                    
+                                    if path_str:
+                                        self.routes.append({
+                                            "method": method,
+                                            "path": path_str,
+                                            "handlers": [node.name],
+                                            "line": dec.lineno
+                                        })
+                        
+                        self.generic_visit(node)
+                        self.current_caller_stack.pop()
+
+                    def visit_AsyncFunctionDef(self, node):
+                        self.visit_FunctionDef(node)
+
+                    def visit_Call(self, node):
+                        callee = None
+                        if isinstance(node.func, ast.Name):
+                            callee = node.func.id
+                        elif isinstance(node.func, ast.Attribute):
+                            callee = node.func.attr
+                        
+                        if callee:
+                            caller = self.current_caller_stack[-1] if self.current_caller_stack else "global"
+                            self.calls.append({
+                                "caller": caller,
+                                "callee": callee,
+                                "line": node.lineno
+                            })
+                        
+                        # Django url mappings check: path('login/', views.login, name='login')
+                        if isinstance(node.func, ast.Name) and node.func.id in ("path", "re_path", "url"):
+                            if len(node.args) >= 2:
+                                path_val = None
+                                handler_val = None
+                                if isinstance(node.args[0], ast.Constant):
+                                    path_val = str(node.args[0].value)
+                                elif isinstance(node.args[0], ast.Str):
+                                    path_val = node.args[0].s
+                                
+                                if isinstance(node.args[1], ast.Name):
+                                    handler_val = node.args[1].id
+                                elif isinstance(node.args[1], ast.Attribute):
+                                    handler_val = node.args[1].attr
+                                
+                                if path_val:
+                                    self.routes.append({
+                                        "method": "get",
+                                        "path": path_val,
+                                        "handlers": [handler_val] if handler_val else ["anonymous"],
+                                        "line": node.lineno
+                                    })
+                        self.generic_visit(node)
+
+                visitor = PythonIRVisitor()
+                visitor.visit(tree)
+                return {
+                    "symbols": visitor.symbols,
+                    "imports": visitor.imports,
+                    "calls": visitor.calls,
+                    "components": [],
+                    "routes": visitor.routes
+                }
             except Exception:
                 pass
 
@@ -707,7 +1168,13 @@ class RepositoryKnowledgeEngine:
         except Exception:
             pass
 
-        return {"symbols": symbols, "imports": imports}
+        return {
+            "symbols": symbols,
+            "imports": imports,
+            "calls": calls,
+            "components": components,
+            "routes": routes
+        }
 
     def get_folder_summary(self, local_path: str, folder_rel: str, tech_stack: List[str]) -> Dict[str, Any]:
         """

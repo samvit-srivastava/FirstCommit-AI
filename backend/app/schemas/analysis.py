@@ -68,6 +68,10 @@ class AnalyzeResponse(BaseModel):
     technologies: List[DetailedTechItem]
     folders: List[FolderExplanationRichItem]
     readme: Optional[str] = None
+    stars: Optional[int] = 0
+    forks: Optional[int] = 0
+    watchers: Optional[int] = 0
+    updated_at: Optional[str] = ""
 
 class ChatRequest(BaseModel):
     repo_id: str
@@ -76,3 +80,40 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     referenced_files: List[str]
+
+class GraphNode(BaseModel):
+    id: str
+    name: str
+    type: str
+    location: str
+    language: Optional[str] = None
+    importance_score: Optional[float] = None
+
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    relation: str
+    file_path: Optional[str] = None
+    language: Optional[str] = None
+    line_number: Optional[int] = None
+
+class RepositoryBrain(BaseModel):
+    languages: List[str]
+    frameworks: List[str]
+    entry_points: List[str]
+    largest_folder: str
+    top_symbols: List[str]
+    most_imported_module: str
+
+class UnifiedGraphData(BaseModel):
+    nodes: List[GraphNode]
+    edges: List[GraphEdge]
+    adjacency_map: dict
+
+class GraphResponse(BaseModel):
+    repository: str
+    generated_at: str
+    graph: UnifiedGraphData
+    brain: RepositoryBrain
+
