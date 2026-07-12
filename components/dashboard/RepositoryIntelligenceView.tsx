@@ -66,6 +66,29 @@ interface GraphData {
   };
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
+
 export function RepositoryIntelligenceView() {
   const { repoUrl, setSelectedNodeId } = useAnalysis();
   const router = useRouter();
@@ -414,7 +437,7 @@ export function RepositoryIntelligenceView() {
       </div>
 
       {/* 2. Navigation Tabs */}
-      <div className="flex border-b border-white/5 space-x-2 shrink-0 bg-black/10 rounded-xl p-1 max-w-md">
+      <div className="flex relative space-x-2 shrink-0 bg-white/[0.02] border border-white/5 rounded-xl p-1.5 max-w-md">
         {[
           { id: "locator", label: "📍 Where is X?" },
           { id: "dependencies", label: "📊 Dependency Explorer" },
@@ -428,13 +451,18 @@ export function RepositoryIntelligenceView() {
                 soundManager.playClick();
                 setActiveTab(tab.id as any);
               }}
-              className={`flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-150 cursor-pointer text-center ${
-                isActive
-                  ? "bg-primary text-white shadow-lg shadow-primary/10"
-                  : "text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.02]"
-              }`}
+              className="flex-1 relative px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg cursor-pointer text-center z-10 transition-colors duration-200"
             >
-              {tab.label}
+              <span className={`relative z-10 transition-colors duration-200 ${isActive ? "text-white" : "text-muted-foreground/60 hover:text-foreground"}`}>
+                {tab.label}
+              </span>
+              {isActive && (
+                <motion.div
+                  layoutId="active-tab"
+                  className="absolute inset-0 bg-primary/20 border border-primary/30 rounded-lg shadow-[0_0_15px_rgba(124,92,255,0.15)]"
+                  transition={{ type: "spring" as const, stiffness: 380, damping: 30 }}
+                />
+              )}
             </button>
           );
         })}
@@ -479,10 +507,10 @@ export function RepositoryIntelligenceView() {
                         placeholder="where is login / authentication / dashboard"
                         value={locatorQuery}
                         onChange={(e) => setLocatorQuery(e.target.value)}
-                        className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
+                        className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all duration-300 shadow-[0_0_15px_rgba(124,92,255,0.02)] focus:shadow-[0_0_20px_rgba(124,92,255,0.1)] text-foreground font-mono"
                       />
                     </div>
-                    <Button type="submit" className="bg-primary hover:brightness-110 cursor-pointer font-bold px-6 py-3 rounded-xl">
+                    <Button type="submit" className="bg-primary hover:brightness-110 cursor-pointer font-bold px-6 py-3 rounded-xl shadow-md hover:shadow-primary/25 transition-all active:scale-98">
                       Search
                     </Button>
                   </form>
@@ -500,14 +528,16 @@ export function RepositoryIntelligenceView() {
                         "parser",
                         "theme provider",
                       ].map((s) => (
-                        <button
+                        <motion.button
                           key={s}
                           type="button"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
                           onClick={() => handleSuggestionClick(s)}
                           className="text-[10px] font-semibold bg-secondary/20 hover:bg-primary/10 border border-border/30 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer text-foreground/85 hover:text-primary font-mono"
                         >
                           where is {s}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -524,7 +554,12 @@ export function RepositoryIntelligenceView() {
                 )}
 
                 {locatorResults.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="grid gap-4 sm:grid-cols-2"
+                  >
                     {locatorResults.map((node) => {
                       const degree = data?.graph.adjacency_map[node.id]?.length || 0;
                       const IconComponent = getNodeIcon(node.type);
@@ -532,9 +567,9 @@ export function RepositoryIntelligenceView() {
                       return (
                         <motion.div
                           key={node.id}
-                          initial={{ opacity: 0, scale: 0.98 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="p-5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] flex flex-col justify-between hover:border-primary/20 transition-all duration-300 relative overflow-hidden"
+                          variants={itemVariants}
+                          whileHover={{ y: -3, borderColor: "rgba(124,92,255,0.2)" }}
+                          className="p-5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] flex flex-col justify-between transition-all duration-300 relative overflow-hidden shadow-sm"
                         >
                           <div className="space-y-3">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -586,7 +621,7 @@ export function RepositoryIntelligenceView() {
                         </motion.div>
                       );
                     })}
-                  </div>
+                  </motion.div>
                 ) : (
                   locatorQuery.trim() !== "" && (
                     <div className="text-center py-10 text-muted-foreground text-xs font-mono bg-white/[0.01] border border-white/5 rounded-2xl">
@@ -619,13 +654,17 @@ export function RepositoryIntelligenceView() {
                       placeholder="Type a component name, file path, route..."
                       value={depSearchQuery}
                       onChange={(e) => setDepSearchQuery(e.target.value)}
-                      className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
+                      className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all duration-300 text-foreground font-mono"
                     />
                   </div>
 
                   {/* Dropdown Suggestions */}
                   {filteredNodesForDep.length > 0 && (
-                    <div className="bg-secondary/90 border border-border/30 rounded-xl overflow-hidden divide-y divide-white/5 shadow-2xl relative z-10">
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-secondary/90 border border-border/30 rounded-xl overflow-hidden divide-y divide-white/5 shadow-2xl relative z-10"
+                    >
                       {filteredNodesForDep.map((node) => {
                         const Icon = getNodeIcon(node.type);
                         return (
@@ -653,124 +692,138 @@ export function RepositoryIntelligenceView() {
                           </button>
                         );
                       })}
-                    </div>
+                    </motion.div>
                   )}
                 </CardContent>
               </Card>
 
               {/* Landing Empty state metrics grid */}
               {!selectedDepNode && (
-                <div className="grid gap-6 md:grid-cols-3">
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="grid gap-6 md:grid-cols-3"
+                >
                   {/* Popular Nodes */}
-                  <Card className="border border-white/5 bg-white/[0.01]">
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
-                          Popular Symbols
-                        </CardTitle>
-                        <CardDescription className="text-[9px] text-muted-foreground">
-                          Highest importance nodes.
-                        </CardDescription>
-                      </div>
-                      <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-2.5">
-                      {popularNodes.map((node) => (
-                        <div
-                          key={node.id}
-                          onClick={() => {
-                            setSelectedDepNode(node);
-                            addToRecentlyViewed(node.id);
-                            soundManager.playClick();
-                          }}
-                          className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all cursor-pointer flex items-center justify-between font-mono text-[11px]"
-                        >
-                          <span className="text-foreground font-semibold truncate max-w-[120px]">{node.name}</span>
-                          <span className="text-[9px] text-muted-foreground/50">Score: {node.importance_score?.toFixed(1)}</span>
+                  <motion.div variants={itemVariants}>
+                    <Card className="border border-white/5 bg-white/[0.01] hover:border-primary/10 transition-colors">
+                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                            Popular Symbols
+                          </CardTitle>
+                          <CardDescription className="text-[9px] text-muted-foreground">
+                            Highest importance nodes.
+                          </CardDescription>
                         </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-
-                  {/* Connected Nodes */}
-                  <Card className="border border-white/5 bg-white/[0.01]">
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
-                          Central Hubs
-                        </CardTitle>
-                        <CardDescription className="text-[9px] text-muted-foreground">
-                          Highest degree connections.
-                        </CardDescription>
-                      </div>
-                      <Network className="h-4 w-4 text-secondary shrink-0" />
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-2.5">
-                      {mostConnectedNodes.map((node) => {
-                        const deg = data?.graph.adjacency_map[node.id]?.length || 0;
-                        return (
-                          <div
+                        <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                      </CardHeader>
+                      <CardContent className="p-3 space-y-2.5">
+                        {popularNodes.map((node) => (
+                          <motion.div
                             key={node.id}
+                            whileHover={{ scale: 1.02, x: 2 }}
                             onClick={() => {
                               setSelectedDepNode(node);
                               addToRecentlyViewed(node.id);
                               soundManager.playClick();
                             }}
-                            className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all cursor-pointer flex items-center justify-between font-mono text-[11px]"
+                            className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all duration-200 cursor-pointer flex items-center justify-between font-mono text-[11px]"
                           >
                             <span className="text-foreground font-semibold truncate max-w-[120px]">{node.name}</span>
-                            <span className="text-[9px] text-muted-foreground/50">Edges: {deg}</span>
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
+                            <span className="text-[9px] text-muted-foreground/50">Score: {node.importance_score?.toFixed(1)}</span>
+                          </motion.div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* Connected Nodes */}
+                  <motion.div variants={itemVariants}>
+                    <Card className="border border-white/5 bg-white/[0.01] hover:border-secondary/10 transition-colors">
+                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                            Central Hubs
+                          </CardTitle>
+                          <CardDescription className="text-[9px] text-muted-foreground">
+                            Highest degree connections.
+                          </CardDescription>
+                        </div>
+                        <Network className="h-4 w-4 text-secondary shrink-0" />
+                      </CardHeader>
+                      <CardContent className="p-3 space-y-2.5">
+                        {mostConnectedNodes.map((node) => {
+                          const deg = data?.graph.adjacency_map[node.id]?.length || 0;
+                          return (
+                            <motion.div
+                              key={node.id}
+                              whileHover={{ scale: 1.02, x: 2 }}
+                              onClick={() => {
+                                setSelectedDepNode(node);
+                                addToRecentlyViewed(node.id);
+                                soundManager.playClick();
+                              }}
+                              className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all duration-200 cursor-pointer flex items-center justify-between font-mono text-[11px]"
+                            >
+                              <span className="text-foreground font-semibold truncate max-w-[120px]">{node.name}</span>
+                              <span className="text-[9px] text-muted-foreground/50">Edges: {deg}</span>
+                            </motion.div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
 
                   {/* Recently Viewed Nodes */}
-                  <Card className="border border-white/5 bg-white/[0.01]">
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
-                          Recently Viewed
-                        </CardTitle>
-                        <CardDescription className="text-[9px] text-muted-foreground">
-                          Your exploration logs.
-                        </CardDescription>
-                      </div>
-                      <History className="h-4 w-4 text-[#00FFC6] shrink-0" />
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-2.5">
-                      {recentlyViewedNodes.length > 0 ? (
-                        recentlyViewedNodes.map((node) => (
-                          <div
-                            key={node.id}
-                            onClick={() => {
-                              setSelectedDepNode(node);
-                              soundManager.playClick();
-                            }}
-                            className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all cursor-pointer flex items-center justify-between font-mono text-[11px]"
-                          >
-                            <span className="text-foreground font-semibold truncate max-w-[120px]">{node.name}</span>
-                            <Badge variant="outline" className="text-[7px] uppercase font-sans py-0 px-1 bg-white/5 border-white/5">
-                              {node.type}
-                            </Badge>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center py-8 text-[10px] text-muted-foreground/40 font-mono">
-                          No viewing logs active yet.
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                  <motion.div variants={itemVariants}>
+                    <Card className="border border-white/5 bg-white/[0.01] hover:border-[#00FFC6]/10 transition-colors">
+                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                            Recently Viewed
+                          </CardTitle>
+                          <CardDescription className="text-[9px] text-muted-foreground">
+                            Your exploration logs.
+                          </CardDescription>
+                        </div>
+                        <History className="h-4 w-4 text-[#00FFC6] shrink-0" />
+                      </CardHeader>
+                      <CardContent className="p-3 space-y-2.5">
+                        {recentlyViewedNodes.length > 0 ? (
+                          recentlyViewedNodes.map((node) => (
+                            <motion.div
+                              key={node.id}
+                              whileHover={{ scale: 1.02, x: 2 }}
+                              onClick={() => {
+                                setSelectedDepNode(node);
+                                soundManager.playClick();
+                              }}
+                              className="p-2.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all duration-200 cursor-pointer flex items-center justify-between font-mono text-[11px]"
+                            >
+                              <span className="text-foreground font-semibold truncate max-w-[120px]">{node.name}</span>
+                              <Badge variant="outline" className="text-[7px] uppercase font-sans py-0 px-1 bg-white/5 border-white/5">
+                                {node.type}
+                              </Badge>
+                            </motion.div>
+                          ))
+                        ) : (
+                          <p className="text-center py-8 text-[10px] text-muted-foreground/40 font-mono">
+                            No viewing logs active yet.
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </motion.div>
               )}
 
               {/* Selected Node Details & Relationships Panel */}
               {selectedDepNode && selectedNodeMetrics && (
                 <div className="space-y-6">
                   {/* Node Header Overview & Statistics */}
-                  <Card className="border border-white/5 bg-white/[0.01] relative overflow-hidden">
+                  <Card className="border border-white/5 bg-white/[0.01] relative overflow-hidden shadow-lg">
                     <div className="absolute top-0 left-0 w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#7C5CFF]/30 to-transparent" />
                     <CardContent className="p-6">
                       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-white/5">
@@ -814,30 +867,26 @@ export function RepositoryIntelligenceView() {
 
                       {/* Performance Centrality Metrics Row */}
                       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3.5 pt-4 font-mono text-[10px]">
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">RKE Importance</p>
-                          <p className="text-base text-primary font-bold mt-1">{selectedNodeMetrics.importance.toFixed(1)}</p>
-                        </div>
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">Centrality</p>
-                          <p className="text-base text-[#00FFC6] font-bold mt-1">{selectedNodeMetrics.centrality}</p>
-                        </div>
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">Imports</p>
-                          <p className="text-base text-foreground font-bold mt-1">{selectedNodeMetrics.imports}</p>
-                        </div>
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">Calls</p>
-                          <p className="text-base text-foreground font-bold mt-1">{selectedNodeMetrics.calls}</p>
-                        </div>
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">Renders</p>
-                          <p className="text-base text-foreground font-bold mt-1">{selectedNodeMetrics.renders}</p>
-                        </div>
-                        <div className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center">
-                          <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">Total Relations</p>
-                          <p className="text-base text-foreground font-bold mt-1">{selectedNodeMetrics.relations}</p>
-                        </div>
+                        {[
+                          { label: "RKE Importance", val: selectedNodeMetrics.importance.toFixed(1), col: "text-primary" },
+                          { label: "Centrality", val: selectedNodeMetrics.centrality, col: "text-[#00FFC6]" },
+                          { label: "Imports", val: selectedNodeMetrics.imports, col: "text-foreground" },
+                          { label: "Calls", val: selectedNodeMetrics.calls, col: "text-foreground" },
+                          { label: "Renders", val: selectedNodeMetrics.renders, col: "text-foreground" },
+                          { label: "Total Relations", val: selectedNodeMetrics.relations, col: "text-foreground" },
+                        ].map((mBox, idx) => (
+                          <motion.div
+                            key={mBox.label}
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.03 }}
+                            whileHover={{ y: -2, borderColor: "rgba(124,92,255,0.2)" }}
+                            className="bg-secondary/15 rounded-xl border border-white/5 p-3 text-center transition-all duration-200"
+                          >
+                            <p className="text-muted-foreground/60 uppercase text-[8px] tracking-wide font-black">{mBox.label}</p>
+                            <p className={`text-base font-bold mt-1 ${mBox.col}`}>{mBox.val}</p>
+                          </motion.div>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
@@ -845,7 +894,7 @@ export function RepositoryIntelligenceView() {
                   {/* Two-Column Dependency Viewer Grid */}
                   <div className="grid gap-6 md:grid-cols-2">
                     {/* Outgoing: Depends On */}
-                    <Card className="border border-white/5 bg-white/[0.01]">
+                    <Card className="border border-white/5 bg-white/[0.01] shadow-sm">
                       <CardHeader className="py-4 border-b border-white/5 flex flex-row items-center justify-between">
                         <div>
                           <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -858,45 +907,54 @@ export function RepositoryIntelligenceView() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-3 max-h-[480px] overflow-y-auto scrollbar-thin">
                         {dependsOnList.length > 0 ? (
-                          dependsOnList.map((dep) => {
-                            const Icon = getNodeIcon(dep.node.type);
-                            return (
-                              <div
-                                key={dep.edge.id}
-                                className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all font-mono"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-xs font-semibold text-foreground truncate">{dep.node.name}</span>
-                                    <Badge variant="outline" className={`text-[7px] py-0 px-1 uppercase ${getNodeBadgeStyle(dep.node.type)}`}>
-                                      {dep.node.type}
-                                    </Badge>
+                          <motion.div
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="show"
+                            className="space-y-3"
+                          >
+                            {dependsOnList.map((dep) => {
+                              const Icon = getNodeIcon(dep.node.type);
+                              return (
+                                <motion.div
+                                  key={dep.edge.id}
+                                  variants={itemVariants}
+                                  whileHover={{ scale: 1.01 }}
+                                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all font-mono"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs font-semibold text-foreground truncate">{dep.node.name}</span>
+                                      <Badge variant="outline" className={`text-[7px] py-0 px-1 uppercase ${getNodeBadgeStyle(dep.node.type)}`}>
+                                        {dep.node.type}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[9px] text-muted-foreground/60 truncate mt-1 select-text">{dep.node.location}</p>
+                                    <p className="text-[8px] text-primary italic uppercase mt-1.5 tracking-wide">Relation: {dep.edge.relation.toLowerCase()}</p>
                                   </div>
-                                  <p className="text-[9px] text-muted-foreground/60 truncate mt-1 select-text">{dep.node.location}</p>
-                                  <p className="text-[8px] text-primary italic uppercase mt-1.5 tracking-wide">Relation: {dep.edge.relation.toLowerCase()}</p>
-                                </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyPath(dep.node.location, dep.node.id)}
-                                    className="text-[9px] text-muted-foreground hover:text-foreground cursor-pointer bg-white/5 p-1.5 rounded"
-                                    title="Copy Path"
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenInGraph(dep.node)}
-                                    className="text-[9px] text-primary hover:text-[#00FFC6] transition-colors cursor-pointer shrink-0 font-bold"
-                                  >
-                                    Open
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPath(dep.node.location, dep.node.id)}
+                                      className="text-[9px] text-muted-foreground hover:text-foreground cursor-pointer bg-white/5 p-1.5 rounded transition-colors"
+                                      title="Copy Path"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenInGraph(dep.node)}
+                                      className="text-[9px] text-primary hover:text-[#00FFC6] transition-colors cursor-pointer shrink-0 font-bold"
+                                    >
+                                      Open
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                          </motion.div>
                         ) : (
                           <p className="text-center py-10 text-xs text-muted-foreground font-mono">
                             No outgoing dependencies or calls detected.
@@ -906,7 +964,7 @@ export function RepositoryIntelligenceView() {
                     </Card>
 
                     {/* Incoming: Used By */}
-                    <Card className="border border-white/5 bg-white/[0.01]">
+                    <Card className="border border-white/5 bg-white/[0.01] shadow-sm">
                       <CardHeader className="py-4 border-b border-white/5 flex flex-row items-center justify-between">
                         <div>
                           <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -919,45 +977,54 @@ export function RepositoryIntelligenceView() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-3 max-h-[480px] overflow-y-auto scrollbar-thin">
                         {usedByList.length > 0 ? (
-                          usedByList.map((dep) => {
-                            const Icon = getNodeIcon(dep.node.type);
-                            return (
-                              <div
-                                key={dep.edge.id}
-                                className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all font-mono"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-xs font-semibold text-foreground truncate">{dep.node.name}</span>
-                                    <Badge variant="outline" className={`text-[7px] py-0 px-1 uppercase ${getNodeBadgeStyle(dep.node.type)}`}>
-                                      {dep.node.type}
-                                    </Badge>
+                          <motion.div
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="show"
+                            className="space-y-3"
+                          >
+                            {usedByList.map((dep) => {
+                              const Icon = getNodeIcon(dep.node.type);
+                              return (
+                                <motion.div
+                                  key={dep.edge.id}
+                                  variants={itemVariants}
+                                  whileHover={{ scale: 1.01 }}
+                                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-white/5 bg-secondary/15 hover:border-[#00FFC6]/20 transition-all font-mono"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs font-semibold text-foreground truncate">{dep.node.name}</span>
+                                      <Badge variant="outline" className={`text-[7px] py-0 px-1 uppercase ${getNodeBadgeStyle(dep.node.type)}`}>
+                                        {dep.node.type}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[9px] text-muted-foreground/60 truncate mt-1 select-text">{dep.node.location}</p>
+                                    <p className="text-[8px] text-[#00FFC6] italic uppercase mt-1.5 tracking-wide">Relation: {dep.edge.relation.toLowerCase()}</p>
                                   </div>
-                                  <p className="text-[9px] text-muted-foreground/60 truncate mt-1 select-text">{dep.node.location}</p>
-                                  <p className="text-[8px] text-[#00FFC6] italic uppercase mt-1.5 tracking-wide">Relation: {dep.edge.relation.toLowerCase()}</p>
-                                </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyPath(dep.node.location, dep.node.id)}
-                                    className="text-[9px] text-muted-foreground hover:text-foreground cursor-pointer bg-white/5 p-1.5 rounded"
-                                    title="Copy Path"
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenInGraph(dep.node)}
-                                    className="text-[9px] text-primary hover:text-[#00FFC6] transition-colors cursor-pointer shrink-0 font-bold"
-                                  >
-                                    Open
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPath(dep.node.location, dep.node.id)}
+                                      className="text-[9px] text-muted-foreground hover:text-foreground cursor-pointer bg-white/5 p-1.5 rounded transition-colors"
+                                      title="Copy Path"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenInGraph(dep.node)}
+                                      className="text-[9px] text-primary hover:text-[#00FFC6] transition-colors cursor-pointer shrink-0 font-bold"
+                                    >
+                                      Open
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                          </motion.div>
                         ) : (
                           <p className="text-center py-10 text-xs text-muted-foreground font-mono">
                             No incoming references or importers found.
