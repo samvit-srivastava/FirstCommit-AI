@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class AnalyzeRequest(BaseModel):
@@ -26,6 +26,29 @@ class TopLevelFolderItem(BaseModel):
     name: str
     purpose: str
 
+class DetailedTechItem(BaseModel):
+    id: str
+    display_name: str
+    name: str
+    category: str
+    confidence: int
+    evidence: str
+    coverage: int
+    version: Optional[str] = None
+
+class FolderExplanationRichItem(BaseModel):
+    name: str
+    category: str
+    description: str
+    contains: List[str]
+    importance: str
+    confidence: int
+    source: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    files_count: int
+    size_bytes: int
+
 class AnalyzeResponse(BaseModel):
     summary: str
     tech_stack: List[TechStackItem]
@@ -42,6 +65,9 @@ class AnalyzeResponse(BaseModel):
     detected_languages: List[str]
     important_files: List[ImportantFileItem]
     top_level_folders: List[TopLevelFolderItem]
+    technologies: List[DetailedTechItem]
+    folders: List[FolderExplanationRichItem]
+    readme: Optional[str] = None
 
 class ChatRequest(BaseModel):
     repo_id: str

@@ -67,7 +67,8 @@ class ParserService:
             "detected_frameworks": [],
             "detected_languages": [],
             "important_files": [],
-            "top_level_folders": []
+            "top_level_folders": [],
+            "readme": readme_content
         }
 
         # 2. Extract Name & Description

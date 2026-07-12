@@ -19,6 +19,31 @@ export interface BackendRoadmapStep {
   description: string;
 }
 
+export interface DetailedTechItem {
+  id: string;
+  display_name: string;
+  name: string;
+  category: string;
+  confidence: number;
+  evidence: string;
+  coverage: number;
+  version: string | null;
+}
+
+export interface DetailedFolderItem {
+  name: string;
+  category: string;
+  description: string;
+  contains: string[];
+  importance: string;
+  confidence: number;
+  source: string;
+  provider: string | null;
+  model: string | null;
+  files_count: number;
+  size_bytes: number;
+}
+
 export interface BackendAnalysisResult {
   summary: string;
   tech_stack: TechStackItem[];
@@ -35,6 +60,9 @@ export interface BackendAnalysisResult {
   detected_languages: string[];
   important_files: { file: string; purpose: string }[];
   top_level_folders: { name: string; purpose: string }[];
+  technologies: DetailedTechItem[];
+  folders: DetailedFolderItem[];
+  readme: string;
 }
 
 interface AnalysisContextType {
