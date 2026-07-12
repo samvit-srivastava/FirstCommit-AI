@@ -76,6 +76,8 @@ interface AnalysisContextType {
   error: string;
   setAnalysis: (data: BackendAnalysisResult, url: string) => void;
   clearAnalysis: () => void;
+  selectedNodeId: string;
+  setSelectedNodeId: (id: string) => void;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -85,6 +87,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState("");
 
   const setAnalysis = (data: BackendAnalysisResult, url: string) => {
     setAnalysisResult(data);
@@ -128,7 +131,9 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         setAnalysis,
-        clearAnalysis
+        clearAnalysis,
+        selectedNodeId,
+        setSelectedNodeId
       }}
     >
       {children}

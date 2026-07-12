@@ -11,6 +11,7 @@ import {
   GitBranch,
   X,
   Network,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { id: "summary", label: "Summary", icon: BookOpen },
   { id: "roadmap", label: "Roadmap", icon: Map },
   { id: "graph", label: "Graph Explorer", icon: Network },
+  { id: "intelligence", label: "Repository Intelligence", icon: Cpu },
   { id: "chat", label: "Ask Repo", icon: MessageSquare },
 ] as const;
 

@@ -65,7 +65,7 @@ interface GraphData {
 }
 
 export function GraphExplorerView() {
-  const { repoUrl, analysisResult } = useAnalysis();
+  const { repoUrl, analysisResult, selectedNodeId, setSelectedNodeId } = useAnalysis();
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,6 +91,27 @@ export function GraphExplorerView() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Effect to handle navigation from other views (auto select/scroll)
+  useEffect(() => {
+    if (selectedNodeId && data?.graph.nodes) {
+      const node = data.graph.nodes.find((n) => n.id === selectedNodeId || n.name === selectedNodeId);
+      if (node) {
+        setSelectedNode(node);
+        setSelectedNodeId(""); // Clear
+        setTimeout(() => {
+          const element = document.getElementById(`node-card-${node.id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            element.classList.add("ring-2", "ring-primary", "animate-pulse");
+            setTimeout(() => {
+              element.classList.remove("ring-2", "ring-primary", "animate-pulse");
+            }, 3000);
+          }
+        }, 300);
+      }
+    }
+  }, [selectedNodeId, data, setSelectedNodeId]);
 
   // Effect to automatically switch activeTab based on node type
   useEffect(() => {
@@ -424,6 +445,7 @@ export function GraphExplorerView() {
                 return (
                   <button
                     key={node.id}
+                    id={`node-card-${node.id}`}
                     onClick={() => setSelectedNode(node)}
                     className={`w-full text-left p-3 rounded-lg border transition-all duration-150 flex items-center justify-between cursor-pointer ${
                       isSelected
