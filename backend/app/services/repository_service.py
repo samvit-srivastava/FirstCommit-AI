@@ -43,6 +43,28 @@ class RepositoryService:
             
         return owner, repo_name
 
+    @staticmethod
+    def resolve_clone_path(repo_url: str) -> Path:
+        """Returns the local clone directory for a validated GitHub URL."""
+        import os
+        import tempfile
+
+        owner, repo_name = RepositoryService._validate_and_parse_url(repo_url)
+
+        if os.name == "nt":
+            for path_str in ["C:/tmp/fcai", "C:/fcai"]:
+                try:
+                    p = Path(path_str)
+                    p.mkdir(parents=True, exist_ok=True)
+                    return p / f"{owner}_{repo_name}"
+                except Exception:
+                    continue
+            temp_dir = Path(tempfile.gettempdir()) / "fcai"
+        else:
+            temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
+
+        return temp_dir / f"{owner}_{repo_name}"
+
     def _delete_dir_with_backoff(self, path: Path) -> None:
         """
         Deletes a directory recursively, clearing read-only attributes on Windows,
@@ -106,22 +128,8 @@ class RepositoryService:
                 pass
 
         # 2. Determine target path in a short directory on Windows
-        if os.name == 'nt':
-            # Try C:\tmp\fcai or C:\fcai for short paths on Windows
-            for path_str in ["C:/tmp/fcai", "C:/fcai"]:
-                try:
-                    p = Path(path_str)
-                    p.mkdir(parents=True, exist_ok=True)
-                    temp_dir = p
-                    break
-                except Exception:
-                    continue
-            else:
-                temp_dir = Path(tempfile.gettempdir()) / "fcai"
-        else:
-            temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
-
-        local_clone_path = temp_dir / f"{owner}_{repo_name}"
+        local_clone_path = self.resolve_clone_path(repo_url)
+        temp_dir = local_clone_path.parent
         
         # 3. Check if already exists and is a valid repository
         if local_clone_path.exists():

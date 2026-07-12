@@ -22,6 +22,25 @@ function GitHubIcon({ className }: { className?: string }) {
 }
 
 const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+/;
+const ANALYZE_TIMEOUT_MS = 5 * 60 * 1000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(
+        "Analysis timed out. Large repositories can take several minutes — try again or use a smaller repo."
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 const SCAN_STEPS = [
   { label: "Repository Connected", freq: 440 },
@@ -67,13 +86,17 @@ export function UrlInput() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const response = await fetch(`${apiUrl}/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetchWithTimeout(
+        `${apiUrl}/analyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ repo_url: url.trim() }),
         },
-        body: JSON.stringify({ repo_url: url.trim() }),
-      });
+        ANALYZE_TIMEOUT_MS
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -95,7 +118,12 @@ export function UrlInput() {
     } catch (err: unknown) {
       console.error(err);
       const error = err as Error;
-      setError(error.message || "An error occurred while connecting to the backend.");
+      const message = error.message || "An error occurred while connecting to the backend.";
+      if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
+        setError("Cannot reach the analysis backend. Make sure the API server is running on port 8000.");
+      } else {
+        setError(message);
+      }
       setIsScanning(false);
     } finally {
       setIsLoading(false);
