@@ -5,21 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Network,
   Cpu,
-  CornerDownRight,
   Search,
-  Filter,
   Layers,
-  ArrowRight,
   Code2,
   FileCode,
   Folder,
   Globe,
-  Settings,
-  HelpCircle,
-  BarChart3,
-  FileText,
-  Workflow,
-  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,8 +108,7 @@ export function GraphExplorerView() {
   useEffect(() => {
     if (!selectedNode) return;
     
-    // Log the selected node ID and type for verification audit
-    console.log(`[GraphExplorer] Selected Node: Name="${selectedNode.name}", ID="${selectedNode.id}", Type="${selectedNode.type}"`);
+
 
     const nodeType = selectedNode.type.toLowerCase();
     if (nodeType === "file") {
@@ -277,39 +267,29 @@ export function GraphExplorerView() {
 
       {/* 0. Graph Summary Statistics */}
       <Card className="glass border-border/40 overflow-hidden">
-        <CardContent className="p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4 text-center divide-x-0 sm:divide-x divide-border/20">
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Files</span>
-            <span className="text-lg font-bold text-foreground">{filesCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Functions</span>
-            <span className="text-lg font-bold text-foreground">{functionsCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Classes</span>
-            <span className="text-lg font-bold text-foreground">{classesCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Components</span>
-            <span className="text-lg font-bold text-foreground">{componentsCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Routes</span>
-            <span className="text-lg font-bold text-foreground">{routesCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Calls</span>
-            <span className="text-lg font-bold text-foreground">{callsCount}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Imports</span>
-            <span className="text-lg font-bold text-foreground">{importsCount}</span>
-          </div>
-          <div className="space-y-1 flex flex-col justify-center">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Renders</span>
-            <span className="text-lg font-bold text-foreground">{rendersCount}</span>
-          </div>
+        <CardContent className="p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-3">
+          {[
+            { label: "Files", value: filesCount },
+            { label: "Functions", value: functionsCount },
+            { label: "Classes", value: classesCount },
+            { label: "Components", value: componentsCount },
+            { label: "Routes", value: routesCount },
+            { label: "Calls", value: callsCount },
+            { label: "Imports", value: importsCount },
+            { label: "Renders", value: rendersCount },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-secondary/15 border border-border/30 rounded-xl p-3 text-center transition-all duration-300 hover:bg-secondary/25 hover:border-primary/20 hover:shadow-[0_0_15px_rgba(124,92,255,0.05)]"
+            >
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground/80 font-bold block">
+                {stat.label}
+              </span>
+              <span className="text-lg font-black text-foreground mt-1 block">
+                {stat.value}
+              </span>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
@@ -798,7 +778,7 @@ export function GraphExplorerView() {
                 </Card>
               </motion.div>
             ) : (
-              <div className="flex h-full items-center justify-center p-6 text-center border border-dashed rounded-xl text-muted-foreground text-xs h-[560px]">
+              <div className="flex h-[560px] items-center justify-center p-6 text-center border border-dashed border-border/60 rounded-2xl text-muted-foreground text-xs bg-white/[0.01]">
                 Select a graph node to explore its codebase call connections and metadata details.
               </div>
             )}

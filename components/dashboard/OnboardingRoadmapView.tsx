@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Copy, ExternalLink, Terminal, GitBranch, Shield, Zap, Sparkles, CheckCircle2 } from "lucide-react";
+import { Check, Copy, ExternalLink, Terminal, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAnalysis } from "@/lib/AnalysisContext";
 import { useAnalysisData } from "@/hooks/use-analysis-data";
@@ -173,11 +173,10 @@ export function OnboardingRoadmapView() {
           </div>
         </CardContent>
       </Card>
-
       {/* 3. Setup Stages checklist */}
       <div className="space-y-6 relative">
         {/* Timeline connect line */}
-        <div className="absolute left-[27px] top-6 bottom-6 w-[1.5px] bg-white/5" />
+        <div className="absolute left-[15px] top-6 bottom-6 w-[2px] bg-white/10" />
 
         {stages.map((stage) => {
           const isCompleted = !!completedStages[stage.step];
@@ -189,43 +188,43 @@ export function OnboardingRoadmapView() {
               {/* Stepper circular node */}
               <div
                 onClick={() => toggleStage(stage.step)}
-                className={`relative z-10 mt-1.5 flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full border cursor-pointer transition-all duration-300 ${
+                className={`relative z-10 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border cursor-pointer transition-all duration-300 ${
                   isCompleted
-                    ? "bg-[#00FFC6]/10 border-[#00FFC6] text-[#00FFC6] shadow-[0_0_12px_rgba(0,255,198,0.2)]"
-                    : "bg-secondary/20 border-border/60 text-muted-foreground hover:border-primary hover:text-foreground"
+                    ? "bg-[#00FFC6]/15 border-[#00FFC6] text-[#00FFC6] shadow-[0_0_12px_rgba(0,255,198,0.25)]"
+                    : "bg-secondary/30 border-border/70 text-slate-300 hover:border-primary hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
                 {isCompleted ? (
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-4 w-4 stroke-[3]" />
                 ) : (
-                  <span className="font-mono text-xs font-bold">{stage.step}</span>
+                  <span className="font-mono text-xs font-black">{stage.step}</span>
                 )}
               </div>
 
               {/* Stage content Card */}
               <div className="flex-1">
                 <Card
-                  className={`glass border-border/40 hover:border-border transition-all duration-300 ${
-                    isCompleted && "bg-white/[0.01] opacity-75"
+                  className={`glass border-border/40 hover:border-border/70 transition-all duration-300 ${
+                    isCompleted && "bg-white/[0.01] opacity-75 shadow-none"
                   }`}
                 >
                   <div className="p-5 space-y-4">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[9px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                          <span className="font-mono text-[9px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-black tracking-wider">
                             STAGE {stage.step}
                           </span>
                           {isCompleted && (
-                            <span className="text-[9px] font-semibold text-[#00FFC6] font-mono uppercase tracking-wide">
-                              Verified Completed
+                            <span className="text-[9px] font-black text-[#00FFC6] font-mono uppercase tracking-widest bg-[#00FFC6]/10 border border-[#00FFC6]/20 px-1.5 py-0.5 rounded">
+                              Verified
                             </span>
                           )}
                         </div>
                         <h3 className={`text-base font-heading font-black tracking-tight ${isCompleted ? 'line-through text-muted-foreground/60' : 'text-foreground'}`}>
                           {stage.title}
                         </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans max-w-3xl">
+                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans max-w-3xl">
                           {stage.description}
                         </p>
                       </div>
@@ -234,10 +233,10 @@ export function OnboardingRoadmapView() {
                       <button
                         type="button"
                         onClick={() => toggleStage(stage.step)}
-                        className={`shrink-0 flex items-center gap-1.5 font-heading font-black uppercase tracking-wider text-[9px] px-3.5 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
+                        className={`shrink-0 flex items-center gap-1.5 font-heading font-black uppercase tracking-wider text-[10px] px-4 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
                           isCompleted
                             ? "bg-[#00FFC6]/15 border-[#00FFC6] text-[#00FFC6]"
-                            : "bg-secondary/10 border-border/60 text-muted-foreground hover:bg-secondary/20 hover:text-foreground"
+                            : "bg-secondary/15 border-border/70 text-slate-200 hover:bg-secondary/35 hover:text-foreground"
                         }`}
                       >
                         {isCompleted ? "COMPLETED" : "MARK COMPLETED"}
@@ -246,8 +245,8 @@ export function OnboardingRoadmapView() {
 
                     {/* Command Console Box */}
                     {hasCommand && (
-                      <div className="rounded-xl border border-white/5 bg-[#020617] font-mono text-xs sm:text-[13px] relative shadow-lg overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 bg-secondary/10 text-muted-foreground/70 text-[9px] uppercase tracking-wider select-none">
+                      <div className="rounded-xl border border-white/10 bg-[#070b14] font-mono text-xs sm:text-[13px] relative shadow-2xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-[#0f172a] text-slate-300 text-[9px] uppercase tracking-wider font-bold select-none">
                           <span>{isUrlCommand ? "url endpoint" : "bash script console"}</span>
                           {isUrlCommand ? (
                             <a
@@ -255,7 +254,7 @@ export function OnboardingRoadmapView() {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={() => soundManager.playClick()}
-                              className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer bg-secondary/20 hover:bg-secondary/40 border border-border/20 px-2 py-0.5 rounded text-[9px]"
+                              className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer bg-secondary/35 hover:bg-secondary/60 border border-white/10 px-2 py-0.5 rounded text-[9px] text-[#00D4FF] font-black"
                             >
                               Launch Port <ExternalLink className="h-2.5 w-2.5" />
                             </a>
@@ -263,13 +262,13 @@ export function OnboardingRoadmapView() {
                             <button
                               type="button"
                               onClick={() => handleCopyCommand(stage.command || "", stage.step)}
-                              className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer bg-secondary/20 hover:bg-secondary/40 border border-border/20 px-2 py-0.5 rounded text-[9px]"
+                              className="hover:text-[#00FFC6] transition-colors flex items-center gap-1 cursor-pointer bg-secondary/35 hover:bg-secondary/60 border border-white/10 px-2 py-0.5 rounded text-[9px] text-primary font-black"
                             >
                               {copiedStageId === stage.step ? "Copied" : "Copy Command"}
                             </button>
                           )}
                         </div>
-                        <pre className="p-4 overflow-x-auto text-foreground/90 leading-relaxed max-h-[160px] scrollbar-thin select-text">
+                        <pre className="p-4 overflow-x-auto text-[#00FFC6] leading-relaxed max-h-[160px] scrollbar-thin select-text font-bold">
                           <code>{stage.command}</code>
                         </pre>
                       </div>
@@ -277,7 +276,7 @@ export function OnboardingRoadmapView() {
 
                     {/* Custom details explanation block */}
                     {stage.details && (
-                      <div className="rounded-xl border border-[#7C5CFF]/15 bg-[#7C5CFF]/5 p-3.5 text-xs text-muted-foreground leading-relaxed font-sans font-medium">
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs text-slate-200 leading-relaxed font-sans font-medium">
                         {stage.details}
                       </div>
                     )}

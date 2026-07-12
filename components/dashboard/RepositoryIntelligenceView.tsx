@@ -11,8 +11,6 @@ import {
   FileCode,
   Folder,
   ExternalLink,
-  ChevronRight,
-  ChevronDown,
   Copy,
   Loader2,
   Network,
@@ -20,8 +18,6 @@ import {
   HelpCircle,
   TrendingUp,
   History,
-  GitPullRequest,
-  CheckCircle,
 } from "lucide-react";
 import { useAnalysis } from "@/lib/AnalysisContext";
 import { soundManager } from "@/lib/sounds";
@@ -516,7 +512,7 @@ export function RepositoryIntelligenceView() {
                   </form>
 
                   <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground/45 uppercase tracking-widest font-black">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
                       Quick Suggestions
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -582,11 +578,11 @@ export function RepositoryIntelligenceView() {
                               </Badge>
                             </div>
 
-                            <p className="text-[10px] font-mono text-muted-foreground/60 break-all select-text bg-white/[0.02] p-2 rounded-lg border border-white/5">
+                            <p className="text-[10px] font-mono text-slate-300 break-all select-text bg-white/[0.02] p-2 rounded-lg border border-white/5">
                               {node.location}
                             </p>
 
-                            <p className="text-xs text-muted-foreground leading-relaxed font-sans font-medium">
+                            <p className="text-xs text-slate-200 leading-relaxed font-sans font-medium">
                               {getNodeDescription(node)}
                             </p>
 
@@ -604,7 +600,7 @@ export function RepositoryIntelligenceView() {
                             <button
                               type="button"
                               onClick={() => handleCopyPath(node.location, node.id)}
-                              className="text-[10px] text-muted-foreground hover:text-foreground font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              className="text-[10px] text-slate-300 hover:text-foreground font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <Copy className="h-3.5 w-3.5" />
                               {copiedNodeId === node.id ? "Copied Path" : "Copy Path"}
