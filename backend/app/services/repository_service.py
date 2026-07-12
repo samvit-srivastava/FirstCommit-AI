@@ -89,14 +89,38 @@ class RepositoryService:
         Validates the GitHub URL, checks if the repo is already cloned, and clones if not.
         Returns a dict with: repository_name, default_branch, local_clone_path, clone_status
         """
+        import os
+        import subprocess
+
         # 1. Validate & Parse URL
         try:
             owner, repo_name = self._validate_and_parse_url(repo_url)
         except ValueError as e:
             raise ValueError(f"URL Validation Error: {str(e)}")
-            
-        # 2. Determine target path in OS temp dir
-        temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
+
+        # Ensure core.longpaths is configured globally on Windows
+        if os.name == 'nt':
+            try:
+                subprocess.run(["git", "config", "--global", "core.longpaths", "true"], capture_output=True)
+            except Exception:
+                pass
+
+        # 2. Determine target path in a short directory on Windows
+        if os.name == 'nt':
+            # Try C:\tmp\fcai or C:\fcai for short paths on Windows
+            for path_str in ["C:/tmp/fcai", "C:/fcai"]:
+                try:
+                    p = Path(path_str)
+                    p.mkdir(parents=True, exist_ok=True)
+                    temp_dir = p
+                    break
+                except Exception:
+                    continue
+            else:
+                temp_dir = Path(tempfile.gettempdir()) / "fcai"
+        else:
+            temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
+
         local_clone_path = temp_dir / f"{owner}_{repo_name}"
         
         # 3. Check if already exists and is a valid repository
@@ -157,7 +181,13 @@ class RepositoryService:
         
         # 4. Clone repository using GitPython (shallow clone, depth=1)
         try:
-            repo = git.Repo.clone_from(repo_url, local_clone_path, depth=1)
+            repo = git.Repo.clone_from(
+                repo_url, 
+                local_clone_path, 
+                depth=1, 
+                multi_options=["-c core.longpaths=true"],
+                allow_unsafe_options=True
+            )
             try:
                 default_branch = repo.active_branch.name
             except TypeError:
@@ -180,8 +210,23 @@ class RepositoryService:
                 raise ValueError("Network error: Could not reach GitHub. Please check your internet connection.")
             elif "terminal prompts disabled" in err_msg.lower() or "username" in err_msg.lower() or "password" in err_msg.lower():
                 raise ValueError("Authentication error: This repository may be private or requires credentials.")
+            elif "filename too long" in err_msg.lower() or "path too long" in err_msg.lower() or "too long" in err_msg.lower():
+                raise ValueError(
+                    "Windows File Path Limit Error: Some file paths in this repository exceed Windows path length limits (260 characters). "
+                    "Please ensure 'git config --global core.longpaths true' is set, and 'LongPathsEnabled' is set to 1 in your "
+                    "Windows Registry (under Computer\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem)."
+                )
             else:
                 raise ValueError(f"Git Clone Failed: {err_msg}")
+        except Exception as e:
+            err_msg = str(e)
+            if "filename too long" in err_msg.lower() or "path too long" in err_msg.lower() or "too long" in err_msg.lower():
+                raise ValueError(
+                    "Windows File Path Limit Error: Some file paths in this repository exceed Windows path length limits (260 characters). "
+                    "Please ensure 'git config --global core.longpaths true' is set, and 'LongPathsEnabled' is set to 1 in your "
+                    "Windows Registry."
+                )
+            raise ValueError(f"Failed to clone repository: {err_msg}")
                 
     def _get_default_branch_from_remote_refs(self, repo: git.Repo) -> str:
         """

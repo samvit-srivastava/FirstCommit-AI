@@ -336,7 +336,15 @@ RKE_NAMESPACE = uuid.UUID("3289196b-0b53-4628-98e3-cf7e1933ba20")
 
 class RepositoryKnowledgeEngine:
     def __init__(self):
-        self.cache_dir = Path("C:/Users/lenovo/.gemini/antigravity/brain/54442039-6681-46f8-aef3-919486f33e98")
+        from pathlib import Path
+
+        self.cache_dir = (
+            Path.home()
+            / ".gemini"
+            / "antigravity"
+            / "brain"
+            / "54442039-6681-46f8-aef3-919486f33e98"
+        )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_cache_path(self, local_path: str) -> Path:

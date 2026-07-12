@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAnalysis } from "@/lib/AnalysisContext";
 
+
 interface GraphNode {
   id: string;
   name: string;
@@ -58,7 +59,7 @@ interface GraphData {
 export function GraphExplorerView() {
   const { repoUrl, analysisResult, selectedNodeId, setSelectedNodeId } = useAnalysis();
   const [data, setData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!repoUrl);
   const [error, setError] = useState("");
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,6 +84,12 @@ export function GraphExplorerView() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Helper to handle selecting a node and changing the active tab based on its type
+  const handleSelectNode = (node: GraphNode) => {
+    setSelectedNode(node);
+    
+    // Log the selected node ID and type for verification audit
+    console.log(`[GraphExplorer] Selected Node: Name="${node.name}", ID="${node.id}", Type="${node.type}"`);
   // Effect to handle navigation from other views (auto select/scroll)
   useEffect(() => {
     if (selectedNodeId && data?.graph.nodes) {
@@ -110,7 +117,7 @@ export function GraphExplorerView() {
     
 
 
-    const nodeType = selectedNode.type.toLowerCase();
+    const nodeType = node.type.toLowerCase();
     if (nodeType === "file") {
       setActiveTab("imports");
     } else if (nodeType === "function" || nodeType === "class") {
@@ -122,7 +129,7 @@ export function GraphExplorerView() {
     } else {
       setActiveTab("overview");
     }
-  }, [selectedNode]);
+  };
 
   // Expandable relationship group states
   const [outgoingExpanded, setOutgoingExpanded] = useState(true);
@@ -130,7 +137,6 @@ export function GraphExplorerView() {
 
   useEffect(() => {
     if (!repoUrl) {
-      setLoading(false);
       return;
     }
 
@@ -146,10 +152,11 @@ export function GraphExplorerView() {
         const json = await res.json();
         setData(json);
         if (json.graph?.nodes?.length > 0) {
-          setSelectedNode(json.graph.nodes[0]);
+          handleSelectNode(json.graph.nodes[0]);
         }
-      } catch (err: any) {
-        setError(err.message || "An error occurred.");
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "An error occurred.";
+        setError(errorMsg);
       } finally {
         setLoading(false);
       }
@@ -248,16 +255,16 @@ export function GraphExplorerView() {
   };
 
   return (
-    <div className="space-y-10 max-w-7xl mx-auto pb-24">
+    <div className="space-y-10 max-w-7xl mx-auto pb-24 font-sans">
       {/* Title */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
             <Network className="h-7 w-7 text-primary" />
             <span>Graph Explorer & Repository Brain</span>
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Explore deterministic codebase call graphs, routing systems, component trees, and imports mapping.
+            Explore call graphs, routing systems, component trees, and module imports.
           </p>
         </div>
         <Badge variant="outline" className="w-fit text-xs px-2 py-0.5 border-primary/20 bg-primary/5 text-primary select-all">
@@ -294,7 +301,7 @@ export function GraphExplorerView() {
       </Card>
 
       {/* 1. Repository Brain Metrics */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 select-none">
         <Card className="glass border-border/40">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-primary">
@@ -365,7 +372,7 @@ export function GraphExplorerView() {
       {/* 2. Interactive Graph Layout */}
       <div className="grid gap-8 lg:grid-cols-12 items-start">
         {/* Nodes search and list (Col 4) */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 space-y-4 select-none">
           <Card className="glass border-border/40 flex flex-col h-[580px]">
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-sm font-bold text-foreground">Codebase Nodes ({sortedNodes.length})</CardTitle>
@@ -456,7 +463,7 @@ export function GraphExplorerView() {
                 );
               })}
               {sortedNodes.length === 0 && (
-                <div className="text-center py-12 text-xs text-muted-foreground">No matching graph nodes found.</div>
+                <div className="text-center py-12 text-xs text-muted-foreground font-mono">No matching nodes found.</div>
               )}
             </div>
           </Card>
@@ -474,7 +481,7 @@ export function GraphExplorerView() {
                 className="space-y-4"
               >
                 <Card className="glass border-border/40 h-[560px] flex flex-col justify-between overflow-hidden">
-                  <CardHeader className="p-4 pb-2 border-b border-border/40">
+                  <CardHeader className="p-4 pb-2 border-b border-border/40 select-none">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Network className="h-4.5 w-4.5 text-primary" />
@@ -488,7 +495,7 @@ export function GraphExplorerView() {
                   </CardHeader>
 
                   {/* Inspector Tabs Navigation */}
-                  <div className="flex bg-secondary/35 border-b border-border/30 px-2 py-1 gap-1 overflow-x-auto">
+                  <div className="flex bg-secondary/35 border-b border-border/30 px-2 py-1 gap-1 overflow-x-auto select-none">
                     {(["overview", "calls", "imports", "components", "routes", "neighbors"] as const).map((tab) => (
                       <button
                         key={tab}
@@ -508,13 +515,13 @@ export function GraphExplorerView() {
                     {activeTab === "overview" && (
                       <div className="space-y-4">
                         <div className="space-y-1">
-                          <span className="text-xs font-semibold text-foreground block">Code Location / Symbol Range</span>
+                          <span className="text-xs font-semibold text-foreground block select-none">Code Location / Symbol Range</span>
                           <div className="bg-secondary/40 font-mono text-[10px] p-2.5 rounded text-foreground select-all">
                             {selectedNode.location || "Root workspace directory"}
                           </div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2 select-none">
                           <span className="text-xs font-semibold text-foreground block">Architectural Meta</span>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className="bg-secondary/25 p-2 rounded">
@@ -535,7 +542,7 @@ export function GraphExplorerView() {
                         <div className="space-y-2">
                           <button 
                             onClick={() => setOutgoingExpanded(!outgoingExpanded)}
-                            className="text-xs font-semibold text-foreground flex items-center justify-between w-full border-b border-border/20 pb-1 cursor-pointer"
+                            className="text-xs font-semibold text-foreground flex items-center justify-between w-full border-b border-border/20 pb-1 cursor-pointer select-none"
                           >
                             <span>Calls Functions (Out-degree)</span>
                             <span className="text-[10px] text-muted-foreground">
@@ -551,14 +558,14 @@ export function GraphExplorerView() {
                                 return (
                                   <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                     <span className="font-medium text-foreground">
-                                      calls <button onClick={() => setSelectedNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
+                                      calls <button onClick={() => handleSelectNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
                                     </span>
                                     {getRelationBadge(edge.relation)}
                                   </div>
                                 );
                               })}
                               {selectedNodeEdges.filter(e => e.relation === "calls" && (e.source === selectedNode.id || fileSymbolIds.includes(e.source))).length === 0 && (
-                                <div className="text-[10px] italic text-muted-foreground/60">No outgoing function calls.</div>
+                                <div className="text-[10px] italic text-muted-foreground/60 select-none">No function calls.</div>
                               )}
                             </div>
                           )}
@@ -567,7 +574,7 @@ export function GraphExplorerView() {
                         <div className="space-y-2">
                           <button 
                             onClick={() => setIncomingExpanded(!incomingExpanded)}
-                            className="text-xs font-semibold text-foreground flex items-center justify-between w-full border-b border-border/20 pb-1 cursor-pointer"
+                            className="text-xs font-semibold text-foreground flex items-center justify-between w-full border-b border-border/20 pb-1 cursor-pointer select-none"
                           >
                             <span>Called By (In-degree)</span>
                             <span className="text-[10px] text-muted-foreground">
@@ -583,14 +590,14 @@ export function GraphExplorerView() {
                                 return (
                                   <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                     <span className="font-medium text-foreground">
-                                      called by <button onClick={() => setSelectedNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
+                                      called by <button onClick={() => handleSelectNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
                                     </span>
                                     {getRelationBadge(edge.relation)}
                                   </div>
                                 );
                               })}
                               {selectedNodeEdges.filter(e => e.relation === "calls" && (e.target === selectedNode.id || fileSymbolIds.includes(e.target))).length === 0 && (
-                                <div className="text-[10px] italic text-muted-foreground/60">Never called by any mapped functions.</div>
+                                <div className="text-[10px] italic text-muted-foreground/60 select-none">Never called by any mapped functions.</div>
                               )}
                             </div>
                           )}
@@ -601,7 +608,7 @@ export function GraphExplorerView() {
                     {activeTab === "imports" && (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Imports Modules
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -611,20 +618,20 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    imports <button onClick={() => setSelectedNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
+                                    imports <button onClick={() => handleSelectNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "imports" && (e.source === selectedNode.id || parentFileId === e.source)).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">No imported modules.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">No imported modules.</div>
                             )}
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Imported By
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -634,14 +641,14 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    imported by <button onClick={() => setSelectedNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
+                                    imported by <button onClick={() => handleSelectNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "imports" && (e.target === selectedNode.id || parentFileId === e.target)).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">Never imported.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">Never imported.</div>
                             )}
                           </div>
                         </div>
@@ -651,7 +658,7 @@ export function GraphExplorerView() {
                     {activeTab === "components" && (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Renders Components
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -661,20 +668,20 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    renders <button onClick={() => setSelectedNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
+                                    renders <button onClick={() => handleSelectNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "renders" && (e.source === selectedNode.id || fileSymbolIds.includes(e.source))).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">Does not render components.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">Does not render components.</div>
                             )}
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Rendered By
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -684,14 +691,14 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    rendered by <button onClick={() => setSelectedNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
+                                    rendered by <button onClick={() => handleSelectNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "renders" && (e.target === selectedNode.id || fileSymbolIds.includes(e.target))).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">Not rendered in JSX tree.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">Not rendered in JSX tree.</div>
                             )}
                           </div>
                         </div>
@@ -701,7 +708,7 @@ export function GraphExplorerView() {
                     {activeTab === "routes" && (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Routes Handled
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -711,20 +718,20 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    routes to <button onClick={() => setSelectedNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
+                                    routes to <button onClick={() => handleSelectNode(tgt)} className="text-primary hover:underline font-bold text-left cursor-pointer">{tgt.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "handled_by" && (e.source === selectedNode.id || fileSymbolIds.includes(e.source))).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">Does not map to route handlers.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">Does not map to route handlers.</div>
                             )}
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                          <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                             Route Handlers Mapping
                           </span>
                           <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
@@ -734,14 +741,14 @@ export function GraphExplorerView() {
                               return (
                                 <div key={edge.id} className="flex justify-between items-center bg-secondary/25 p-2 rounded border border-border/20 text-[10px]">
                                   <span className="font-medium text-foreground">
-                                    handler for <button onClick={() => setSelectedNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
+                                    handler for <button onClick={() => handleSelectNode(src)} className="text-primary hover:underline font-bold text-left cursor-pointer">{src.name}</button>
                                   </span>
                                   {getRelationBadge(edge.relation)}
                                 </div>
                               );
                             })}
                             {selectedNodeEdges.filter(e => e.relation === "handled_by" && (e.target === selectedNode.id || fileSymbolIds.includes(e.target))).length === 0 && (
-                              <div className="text-[10px] italic text-muted-foreground/60">No route mapping to this handler.</div>
+                              <div className="text-[10px] italic text-muted-foreground/60 select-none">No route mapping to this handler.</div>
                             )}
                           </div>
                         </div>
@@ -750,7 +757,7 @@ export function GraphExplorerView() {
 
                     {activeTab === "neighbors" && (
                       <div className="space-y-2">
-                        <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1">
+                        <span className="text-xs font-semibold text-foreground block border-b border-border/20 pb-1 select-none">
                           Direct Adjacency Neighbors ({activeNeighbors.length})
                         </span>
                         <div className="grid gap-2 sm:grid-cols-2 max-h-[220px] overflow-y-auto">
@@ -760,7 +767,7 @@ export function GraphExplorerView() {
                             return (
                               <button
                                 key={nbId}
-                                onClick={() => setSelectedNode(neighborNode)}
+                                onClick={() => handleSelectNode(neighborNode)}
                                 className="text-left p-2 rounded bg-secondary/35 border border-border/20 text-[10px] truncate hover:bg-secondary/65 transition-colors flex items-center justify-between cursor-pointer"
                               >
                                 <span className="truncate">{neighborNode.name}</span>
@@ -769,7 +776,7 @@ export function GraphExplorerView() {
                             );
                           })}
                           {activeNeighbors.length === 0 && (
-                            <div className="text-[10px] italic text-muted-foreground col-span-2">No adjacent nodes in neighborhood.</div>
+                            <div className="text-[10px] italic text-muted-foreground col-span-2 select-none">No adjacent nodes in neighborhood.</div>
                           )}
                         </div>
                       </div>

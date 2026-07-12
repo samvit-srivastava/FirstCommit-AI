@@ -64,7 +64,7 @@ export function TopBar({ onMobileMenuToggle }: TopBarProps) {
       </div>
 
       {/* Right: AI Ready indicator */}
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/25 select-none tracking-wider">
         <span className="h-1.5 w-1.5 rounded-full bg-[#00FFC6] animate-pulse" />
         AI READY
       </span>

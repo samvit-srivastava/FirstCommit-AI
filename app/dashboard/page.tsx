@@ -117,15 +117,15 @@ export default function DashboardPage() {
         <div className="absolute top-0 left-0 h-[1px] w-full bg-[linear-gradient(90deg,transparent,#7C5CFF,#00D4FF,transparent)] opacity-40" />
         
         <div>
-          <h1 className="text-xl font-heading font-black tracking-tight text-foreground">
+          <h1 className="text-xl font-heading font-black tracking-tight text-foreground sm:text-2xl">
             Repository Intelligence
           </h1>
-          <p className="text-xs text-muted-foreground/50 mt-0.5 leading-relaxed font-medium">
+          <p className="text-xs sm:text-sm text-muted-foreground/70 mt-1 leading-relaxed font-medium">
             Analyze, understand and navigate your codebase with AI.
           </p>
         </div>
 
-        {/* Telemetry bar */}
+        {/* Telemetry Capsule bar */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] text-muted-foreground/40 font-mono">
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">REPOSITORY:</span>
@@ -138,14 +138,18 @@ export default function DashboardPage() {
           </div>
           <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">ANALYZED:</span>
-            <span className="text-foreground font-bold">JUST NOW</span>
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">LANGUAGE:</span>
+            <div className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-mono font-bold bg-white/[0.04] border border-white/10 backdrop-blur-sm shadow-sm select-none">
+              <span className="bg-gradient-to-r from-[#8B5CF6] to-[#00D4FF] bg-clip-text text-transparent font-black">
+                {data.summary.language || "TypeScript"}
+              </span>
+            </div>
           </div>
           <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[8px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/20">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[8px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/20">
               <span className="h-1.5 w-1.5 rounded-full bg-[#00FFC6] animate-pulse" />
-              AI ACTIVE
+              AI COMPLETE
             </span>
           </div>
         </div>
