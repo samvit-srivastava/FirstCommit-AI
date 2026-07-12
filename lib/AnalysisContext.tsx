@@ -75,6 +75,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
       const savedUrl = localStorage.getItem("repo_url");
 
       if (savedResult) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAnalysisResult(JSON.parse(savedResult));
       }
       if (savedUrl) {

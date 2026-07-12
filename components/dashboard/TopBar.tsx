@@ -3,16 +3,12 @@
 import {
   Menu,
   Search,
-  Moon,
-  Sun,
   ExternalLink,
   Star,
   ChevronDown,
 } from "lucide-react";
 import { useAnalysis } from "@/lib/AnalysisContext";
 import { Badge } from "@/components/ui/badge";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 
 interface TopBarProps {
   onMobileMenuToggle: () => void;
@@ -21,13 +17,6 @@ interface TopBarProps {
 
 export function TopBar({ onMobileMenuToggle }: TopBarProps) {
   const { analysisResult, repoUrl } = useAnalysis();
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
 
   if (!analysisResult) {
     return (
@@ -99,18 +88,7 @@ export function TopBar({ onMobileMenuToggle }: TopBarProps) {
         </kbd>
       </div>
 
-      {/* Theme toggle */}
-      <button
-        onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground cursor-pointer"
-        aria-label="Toggle theme"
-      >
-        {mounted && resolvedTheme === "dark" ? (
-          <Sun className="h-4 w-4" />
-        ) : (
-          <Moon className="h-4 w-4" />
-        )}
-      </button>
+
 
       {/* User avatar placeholder */}
       <div
