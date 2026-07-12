@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Star, Code2, Globe, Cpu, AlertTriangle, Compass, CheckCircle2, ListCollapse, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAnalysisData } from "@/hooks/use-analysis-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import { soundManager } from "@/lib/sounds";
 
 const itemVariants = {
@@ -26,6 +27,7 @@ const containerVariants = {
 export function ProjectSummaryView() {
   const { data } = useAnalysisData();
   const { summary } = data;
+  const { analysisResult } = useAnalysis();
   const [selectedNode, setSelectedNode] = useState<string>("parser");
 
   const insights = [
@@ -287,7 +289,7 @@ export function ProjectSummaryView() {
       </div>
       
       {/* README Content Section */}
-      {analysisResult.readme && (
+      {analysisResult?.readme && (
         <motion.div variants={itemVariants}>
           <Card className="glass border-border/40 overflow-hidden relative">
             <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
