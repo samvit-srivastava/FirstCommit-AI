@@ -186,6 +186,26 @@ export function ProjectSummaryView() {
           </Card>
         </motion.div>
       </div>
+      
+      {/* README Content Section */}
+      {analysisResult.readme && (
+        <motion.div variants={itemVariants}>
+          <Card className="glass border-border/40 overflow-hidden relative">
+            <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+            <CardHeader className="pb-3 border-b border-border/20">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-primary" />
+                README.md Documentation
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 max-h-96 overflow-y-auto">
+              <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-muted-foreground select-text">
+                {analysisResult.readme}
+              </pre>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Highlights Section */}
       <motion.div variants={itemVariants}>

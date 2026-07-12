@@ -9,12 +9,23 @@ from app.schemas.analysis import (
     RoadmapStep,
     ImportantFileItem,
     TopLevelFolderItem,
+    DetailedTechItem,
+    FolderExplanationRichItem,
 )
-from app.services import RepositoryService, ParserService
+from app.services import (
+    RepositoryService,
+    ParserService,
+    TechDetectorService,
+    FolderExplanationService,
+    RepositoryKnowledgeEngine,
+)
 
 router = APIRouter()
 repository_service = RepositoryService()
 parser_service = ParserService()
+tech_detector_service = TechDetectorService()
+folder_explanation_service = FolderExplanationService()
+repository_knowledge_engine = RepositoryKnowledgeEngine()
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_repository(payload: AnalyzeRequest):
@@ -26,24 +37,35 @@ async def analyze_repository(payload: AnalyzeRequest):
     try:
         clone_info = repository_service.clone_repository(payload.repo_url)
         parser_info = parser_service.parse_repository(clone_info["local_clone_path"])
+        detected_tech = tech_detector_service.detect_technologies(clone_info["local_clone_path"])
+        tech_names = [t["display_name"] for t in detected_tech]
+        
+        # Query Repository Knowledge Engine (RKE) Core
+        rke_index = repository_knowledge_engine.get_index(clone_info["local_clone_path"])
+        
+        # Always prepend root folder ("") summary so root files list and metadata is visible
+        rich_folders = [
+            repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], "", tech_names)
+        ] + [
+            repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], f["name"], tech_names)
+            for f in parser_info["top_level_folders"]
+        ]
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Dynamically build tech_stack from detected frameworks and languages
     tech_stack = []
-    for framework in parser_info["detected_frameworks"]:
-        category = "Frontend"
-        if framework in ("FastAPI", "Django", "Flask", "Express"):
-            category = "Backend"
-        elif framework in ("Vite", "Turbopack", "Webpack"):
-            category = "DevOps"
-        tech_stack.append(TechStackItem(name=framework, category=category, icon=framework.lower()))
-        
-    for language in parser_info["detected_languages"]:
-        tech_stack.append(TechStackItem(name=language, category="Language", icon=language.lower()))
+    for t in detected_tech:
+        tech_stack.append(TechStackItem(
+            name=t["name"],
+            category=t["category"],
+            icon=t["name"].lower().replace(" ", "").replace(".", "")
+        ))
 
-    # Dynamically list top-level folders with purpose "Unknown"
+    # Dynamically list folders with Root prefixed
     folder_explanation = [
+        FolderExplanationItem(path="Root/", purpose="Contains project configuration and entrypoints.")
+    ] + [
         FolderExplanationItem(path=folder["name"] + "/", purpose=folder["purpose"])
         for folder in parser_info["top_level_folders"]
     ]
@@ -84,7 +106,37 @@ async def analyze_repository(payload: AnalyzeRequest):
         top_level_folders=[
             TopLevelFolderItem(name=f["name"], purpose=f["purpose"])
             for f in parser_info["top_level_folders"]
-        ]
+        ],
+        technologies=[
+            DetailedTechItem(
+                id=t["id"],
+                display_name=t["display_name"],
+                name=t["name"],
+                category=t["category"],
+                confidence=t["confidence"],
+                evidence=t["evidence"],
+                coverage=t["coverage"],
+                version=t["version"]
+            )
+            for t in detected_tech
+        ],
+        folders=[
+            FolderExplanationRichItem(
+                name=f["name"],
+                category=f["category"],
+                description=f["description"],
+                contains=f["contains"],
+                importance=f["importance"],
+                confidence=f["confidence"],
+                source=f["source"],
+                provider=f.get("provider"),
+                model=f.get("model"),
+                files_count=f.get("files_count", 0),
+                size_bytes=f.get("size_bytes", 0)
+            )
+            for f in rich_folders
+        ],
+        readme=parser_info.get("readme", "")
     )
 
 @router.post("/chat", response_model=ChatResponse)

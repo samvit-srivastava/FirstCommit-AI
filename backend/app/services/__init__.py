@@ -1,2 +1,5 @@
 from app.services.repository_service import RepositoryService
 from app.services.parser_service import ParserService
+from app.services.tech_detector_service import TechDetectorService
+from app.services.folder_explanation_service import FolderExplanationService
+from app.services.repository_knowledge_engine import RepositoryKnowledgeEngine
