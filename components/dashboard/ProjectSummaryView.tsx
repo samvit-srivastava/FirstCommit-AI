@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
-  BookOpen, Star, Code2, Shield, ExternalLink, Activity, Cpu, Compass, Clock, GitBranch
+  BookOpen, Star, Code2, Shield, ExternalLink, Activity, Cpu, Compass, Clock, GitBranch,
+  Globe, AlertTriangle, CheckCircle2, ListCollapse, ArrowRight
 } from "lucide-react";
 import { useAnalysisData } from "@/hooks/use-analysis-data";
 import { useAnalysis } from "@/lib/AnalysisContext";
 import { soundManager } from "@/lib/sounds";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
@@ -246,6 +247,14 @@ export function ProjectSummaryView() {
   const { data } = useAnalysisData();
   const { summary, techStack } = data;
   const { analysisResult } = useAnalysis();
+  const [selectedNode, setSelectedNode] = useState<string>("parser");
+
+  const DIAGRAM_NODES = [
+    { id: "input", label: "GitHub URL", description: "Clones repository structure from public URL targets.", icon: Globe },
+    { id: "parser", label: "Repo Parser", description: "Detects package dependencies, languages, and settings.", icon: Cpu },
+    { id: "graph", label: "Knowledge Graph", description: "Builds semantic mappings of folder structures.", icon: ListCollapse },
+    { id: "roadmap", label: "Roadmap Engine", description: "Generates tailored step timelines for roles.", icon: Compass },
+  ];
 
   return (
     <motion.div
@@ -318,7 +327,76 @@ export function ProjectSummaryView() {
         </Card>
       </motion.div>
 
-      {/* 3. Highlights Cards Grid */}
+      {/* 3. Interactive Code Pipeline Block Diagram */}
+      <motion.div variants={cardVariants} className="w-full">
+        <Card className="glass border-border/40 relative overflow-hidden transition-all duration-300 shadow-lg group">
+          <div className="absolute top-0 right-0 h-1.5 w-1.5 bg-primary/45 rounded-bl-sm group-hover:bg-[#00FFC6] transition-colors" />
+          <CardHeader className="pb-3 border-b border-border/10">
+            <CardTitle className="text-base font-heading font-bold text-foreground">
+              Repository Compilation & Flow Diagram
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground/50 mt-0.5">
+              Select any block inside the AI pipeline to analyze mapping descriptions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            {/* Interactive diagram grid */}
+            <div className="flex flex-col md:flex-row items-center justify-around gap-6 py-4">
+              {DIAGRAM_NODES.map((node, idx) => {
+                const NodeIcon = node.icon;
+                const isSelected = selectedNode === node.id;
+                return (
+                  <div key={node.id} className="flex flex-col md:flex-row items-center w-full md:w-auto">
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      onClick={() => {
+                        soundManager.playClick();
+                        setSelectedNode(node.id);
+                      }}
+                      onMouseEnter={() => soundManager.playHover()}
+                      className={`h-24 w-40 flex flex-col items-center justify-center gap-2 p-3 rounded-xl border text-center transition-all duration-300 cursor-pointer ${
+                        isSelected
+                          ? "bg-primary/15 border-primary text-foreground glow"
+                          : "bg-secondary/10 border-border/60 text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      <NodeIcon className={`h-6 w-6 ${isSelected ? 'text-[#00FFC6]' : 'text-primary/75'}`} />
+                      <span className="font-heading text-xs font-bold uppercase tracking-wider">{node.label}</span>
+                    </motion.div>
+
+                    {idx < DIAGRAM_NODES.length - 1 && (
+                      <div className="flex items-center justify-center h-8 md:h-auto w-auto md:w-16 rotate-90 md:rotate-0 mt-2 md:mt-0">
+                        <ArrowRight className="h-4 w-4 text-primary/45 animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Node descriptions board */}
+            <div className="mt-4 p-4 bg-secondary/15 rounded-xl border border-border/30 h-20 flex flex-col justify-center">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={selectedNode}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-xs sm:text-sm font-sans text-muted-foreground"
+                >
+                  <span className="text-[#00FFC6] font-bold uppercase font-mono mr-1.5">
+                    [{selectedNode}]:
+                  </span>
+                  {DIAGRAM_NODES.find((node) => node.id === selectedNode)?.description}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* 4. Highlights Cards Grid */}
       <motion.div
         variants={containerVariants}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
@@ -414,14 +492,14 @@ export function ProjectSummaryView() {
         )}
       </motion.div>
 
-      {/* 4. Details Split Layout */}
+      {/* 5. Details Split Layout */}
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Side: Tech stack pills */}
-        {techStack && techStack.length > 0 && (
-          <motion.div variants={cardVariants} className="md:col-span-2">
-            <Card className="glass border-border/40 relative overflow-hidden transition-all duration-300 shadow-lg group h-full flex flex-col justify-between">
-              <div className="absolute top-0 right-0 h-1.5 w-1.5 bg-primary/45 rounded-bl-sm group-hover:bg-[#00FFC6] transition-colors" />
-              <div>
+        {/* Left Side: Tech stack pills & Insights Cards */}
+        <div className="md:col-span-2 space-y-6">
+          {techStack && techStack.length > 0 && (
+            <motion.div variants={cardVariants}>
+              <Card className="glass border-border/40 relative overflow-hidden transition-all duration-300 shadow-lg group">
+                <div className="absolute top-0 right-0 h-1.5 w-1.5 bg-primary/45 rounded-bl-sm group-hover:bg-[#00FFC6] transition-colors" />
                 <CardHeader className="pb-3 border-b border-border/10">
                   <CardTitle className="text-base font-heading font-bold text-foreground flex items-center gap-2.5">
                     <Activity className="h-4.5 w-4.5 text-[#00FFC6]" />
@@ -443,10 +521,64 @@ export function ProjectSummaryView() {
                     </motion.div>
                   ))}
                 </CardContent>
-              </div>
-            </Card>
-          </motion.div>
-        )}
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Strengths, Weaknesses & Recommendations */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* Strengths */}
+            <motion.div variants={cardVariants} whileHover={{ scale: 1.02, y: -2 }}>
+              <Card className="glass border-emerald-500/20 h-full relative overflow-hidden transition-all duration-300 shadow-md group">
+                <CardHeader className="pb-2 border-b border-border/10">
+                  <CardTitle className="text-xs font-heading font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    Key Strengths
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-2 text-[11px] text-muted-foreground/80 leading-relaxed font-sans font-medium">
+                  <p>• Modular design pattern simplifies component isolation.</p>
+                  <p>• Fast build execution times optimized by Rust tooling.</p>
+                  <p>• Low redundancy levels with high type coverage safety.</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Weaknesses */}
+            <motion.div variants={cardVariants} whileHover={{ scale: 1.02, y: -2 }}>
+              <Card className="glass border-amber-500/20 h-full relative overflow-hidden transition-all duration-300 shadow-md group">
+                <CardHeader className="pb-2 border-b border-border/10">
+                  <CardTitle className="text-xs font-heading font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                    Identified Gaps
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-2 text-[11px] text-muted-foreground/80 leading-relaxed font-sans font-medium">
+                  <p>• Low unit testing coverage across sub-modules.</p>
+                  <p>• Lack of descriptive JSDoc block parameter annotations.</p>
+                  <p>• Empty configuration defaults causing build locks.</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Recommendations */}
+            <motion.div variants={cardVariants} whileHover={{ scale: 1.02, y: -2 }}>
+              <Card className="glass border-primary/20 h-full relative overflow-hidden transition-all duration-300 shadow-md group">
+                <CardHeader className="pb-2 border-b border-border/10">
+                  <CardTitle className="text-xs font-heading font-bold uppercase tracking-wider text-[#00D4FF] flex items-center gap-1.5">
+                    <Compass className="h-3.5 w-3.5 text-[#00D4FF]" />
+                    Next Steps
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-2 text-[11px] text-muted-foreground/80 leading-relaxed font-sans font-medium">
+                  <p>• Introduce Playwright integration for e2e validation flows.</p>
+                  <p>• Configure CI pipelines to enforce prettier styling linting.</p>
+                  <p>• Write unit testing models for helper utility functions.</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
 
         {/* Right Side: Repository Metadata (RepoInfoPanel Twin) */}
         <motion.div variants={cardVariants}>
@@ -524,7 +656,7 @@ export function ProjectSummaryView() {
         </motion.div>
       </div>
 
-      {/* 5. README Document Box */}
+      {/* 6. README Document Box */}
       {analysisResult?.readme && (
         <motion.div variants={cardVariants}>
           <Card className="glass border-border/40 relative overflow-hidden transition-all duration-300 shadow-lg group">

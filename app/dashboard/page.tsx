@@ -10,6 +10,28 @@ import { useAnalysisData } from "@/hooks/use-analysis-data";
 import { mockRecentActivity } from "@/lib/mock-data";
 import { soundManager } from "@/lib/sounds";
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15, scale: 0.985, filter: "blur(4px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { type: "spring" as const, stiffness: 90, damping: 14 },
+  },
+};
+
 export default function DashboardPage() {
   const { data, hasRealData } = useAnalysisData();
 
@@ -17,22 +39,29 @@ export default function DashboardPage() {
     soundManager.playSuccess();
   }, []);
 
-  // Dynamically derive overview stats from the current data
+  // Extract owner from repository URL
+  const getOwner = (url: string) => {
+    if (!url) return "firstcommit";
+    const parts = url.split("/");
+    return parts[3] || "firstcommit";
+  };
+
+  // Dynamically derive overview stats from real data context
   const overviewStats = [
     {
       label: "Technologies",
       value: String(data.techStack.length),
-      description: "Frameworks, languages, and build tools identified",
+      description: "Languages and frameworks identified",
     },
     {
       label: "Folders Mapped",
       value: String(data.folders.length),
-      description: "Top-level directories analyzed",
+      description: "Top-level directories explained",
     },
     {
       label: "Roadmap Steps",
       value: String(data.roadmap.frontend.length),
-      description: "Personalized learning steps created",
+      description: "Personalized onboarding tasks",
     },
     {
       label: "GitHub Stars",
@@ -74,14 +103,16 @@ export default function DashboardPage() {
     : mockRecentActivity;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 select-none">
-      
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="mx-auto max-w-7xl space-y-8 select-none font-sans"
+    >
       {/* 1. Cinematic Staggered Compact Hero Panel */}
       <motion.div 
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="border border-white/10 bg-white/[0.02] backdrop-blur-md shadow-2xl p-6 rounded-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6"
+        variants={itemVariants}
+        className="border border-white/10 bg-white/[0.02] backdrop-blur-md shadow-2xl px-6 py-4.5 rounded-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4"
       >
         <div className="absolute top-0 left-0 h-[1px] w-full bg-[linear-gradient(90deg,transparent,#7C5CFF,#00D4FF,transparent)] opacity-40" />
         
@@ -102,6 +133,11 @@ export default function DashboardPage() {
           </div>
           <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
           <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">OWNER:</span>
+            <span className="text-[#00D4FF] font-bold">{getOwner(data.summary.url)}</span>
+          </div>
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">LANGUAGE:</span>
             <div className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-mono font-bold bg-white/[0.04] border border-white/10 backdrop-blur-sm shadow-sm select-none">
               <span className="bg-gradient-to-r from-[#8B5CF6] to-[#00D4FF] bg-clip-text text-transparent font-black">
@@ -119,19 +155,27 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* 2. Core Stats */}
-      <OverviewCards stats={overviewStats} />
+      {/* 2. Overview Stats (Redesigned Glass Tiles) */}
+      <motion.div variants={itemVariants}>
+        <OverviewCards stats={overviewStats} />
+      </motion.div>
 
-      {/* 3. Details Split layout */}
+      {/* 3. Details Split layout (Timeline, Action center, Info Panel) */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <RecentActivity activities={recentActivity} />
-          <QuickActions />
+          <motion.div variants={itemVariants}>
+            <RecentActivity activities={recentActivity} />
+          </motion.div>
+          
+          <motion.div variants={itemVariants}>
+            <QuickActions />
+          </motion.div>
         </div>
-        <div>
+        
+        <motion.div variants={itemVariants}>
           <RepoInfoPanel summary={data.summary} />
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

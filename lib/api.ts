@@ -18,6 +18,10 @@ export interface AnalyzeBackendResponse {
   detected_languages: string[];
   important_files: Array<{ file: string; purpose: string }>;
   top_level_folders: Array<{ name: string; purpose: string }>;
+  stars?: number;
+  forks?: number;
+  watchers?: number;
+  updated_at?: string;
 }
 
 export interface ChatBackendResponse {
@@ -78,7 +82,11 @@ export function mapBackendResponseToResult(
       description: backend.description || backend.summary || "No description provided.",
       purpose: `To serve as a modular ${backend.repository_type || "application"} leveraging ${backend.detected_languages?.join(", ") || "multiple technologies"}.`,
       architecture: `Cloned default branch '${backend.default_branch || "main"}' to path: ${backend.local_clone_path || "temp"}.`,
-      stars: 120, // default placeholder
+      stars: backend.stars ?? 0,
+      forks: backend.forks ?? 0,
+      watchers: backend.watchers ?? 0,
+      default_branch: backend.default_branch || "main",
+      updated_at: backend.updated_at || "",
       language: backend.detected_languages?.[0] || "TypeScript",
       url: repoUrl,
     },

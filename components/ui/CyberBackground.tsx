@@ -107,9 +107,14 @@ export function CyberBackground() {
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-50 overflow-hidden bg-[#030712]">
-      {/* 1. Subtle, slow pulse nebula auroras */}
-      <div className="absolute -left-[10%] -top-[10%] h-[70%] w-[70%] rounded-full bg-[radial-gradient(circle_at_center,rgba(124,92,255,0.04)_0%,rgba(0,0,0,0)_70%)] blur-[140px] pointer-events-none" />
+      {/* 1. Subtle, slow pulse nebula auroras with warm accents */}
+      <div className="absolute -left-[10%] -top-[10%] h-[70%] w-[70%] rounded-full bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.045)_0%,rgba(0,0,0,0)_70%)] blur-[140px] pointer-events-none" />
       <div className="absolute -right-[10%] -bottom-[10%] h-[75%] w-[75%] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,212,255,0.03)_0%,rgba(0,0,0,0)_70%)] blur-[120px] pointer-events-none" />
+      {/* Soft warm gold-violet highlight for premium visual depth */}
+      <div className="absolute left-[30%] top-[20%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle_at_center,rgba(227,142,255,0.02)_0%,rgba(0,0,0,0)_60%)] blur-[130px] pointer-events-none animate-pulse" style={{ animationDuration: "12s" }} />
+
+      {/* Soft Vignette to draw focus to the center content area */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(3,7,18,0.5)_100%)] pointer-events-none" />
 
       {/* 2. Extremely subtle cyber grid overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(14,16,42,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(14,16,42,0.06)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_75%,transparent_100%)]" />
