@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from app.schemas.analysis import (
     AnalyzeRequest,
@@ -26,45 +27,41 @@ tech_detector_service = TechDetectorService()
 folder_explanation_service = FolderExplanationService()
 repository_knowledge_engine = RepositoryKnowledgeEngine()
 
-@router.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_repository(payload: AnalyzeRequest):
-    """
-    Analyzes a GitHub repository URL: validates and clones the repository,
-    and returns a summary, tech stack, folder explanation, onboarding roadmap,
-    and clone metadata.
-    """
-    try:
-        clone_info = repository_service.clone_repository(payload.repo_url)
-        parser_info = parser_service.parse_repository(clone_info["local_clone_path"])
-        detected_tech = tech_detector_service.detect_technologies(clone_info["local_clone_path"])
-        tech_names = [t["display_name"] for t in detected_tech]
-        
-        # Query Repository Knowledge Engine (RKE) Core
-        rke_index = repository_knowledge_engine.get_index(clone_info["local_clone_path"])
-        
-        # Always prepend root folder ("") summary so root files list and metadata is visible
-        rich_folders = [
-            repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], "", tech_names)
-        ] + [
-            repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], f["name"], tech_names)
-            for f in parser_info["top_level_folders"]
-        ]
-        
-        # Fetch live GitHub API metadata
-        github_meta = repository_service.get_github_metadata(payload.repo_url)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
-    # Dynamically build tech_stack from detected frameworks and languages
+def _analyze_repository_sync(repo_url: str) -> AnalyzeResponse:
+    """
+    Blocking analysis pipeline. Runs in a worker thread so the API stays responsive.
+    """
+    clone_info = repository_service.clone_repository(repo_url)
+    parser_info = parser_service.parse_repository(clone_info["local_clone_path"])
+    detected_tech = tech_detector_service.detect_technologies(clone_info["local_clone_path"])
+    tech_names = [t["display_name"] for t in detected_tech]
+
+    rke_index = repository_knowledge_engine.get_index(clone_info["local_clone_path"])
+
+    rich_folders = [
+        repository_knowledge_engine.get_folder_summary(
+            clone_info["local_clone_path"], "", tech_names, index=rke_index
+        )
+    ] + [
+        repository_knowledge_engine.get_folder_summary(
+            clone_info["local_clone_path"], f["name"], tech_names, index=rke_index
+        )
+        for f in parser_info["top_level_folders"]
+    ]
+
+    github_meta = repository_service.get_github_metadata(repo_url)
+
     tech_stack = []
     for t in detected_tech:
-        tech_stack.append(TechStackItem(
-            name=t["name"],
-            category=t["category"],
-            icon=t["name"].lower().replace(" ", "").replace(".", "")
-        ))
+        tech_stack.append(
+            TechStackItem(
+                name=t["name"],
+                category=t["category"],
+                icon=t["name"].lower().replace(" ", "").replace(".", ""),
+            )
+        )
 
-    # Dynamically list folders with Root prefixed
     folder_explanation = [
         FolderExplanationItem(path="Root/", purpose="Contains project configuration and entrypoints.")
     ] + [
@@ -72,19 +69,18 @@ async def analyze_repository(payload: AnalyzeRequest):
         for folder in parser_info["top_level_folders"]
     ]
 
-    # Generate a deterministic static roadmap based on the detected repository type
     repo_type = parser_info["repository_type"]
     roadmap = [
         RoadmapStep(
             step_number=1,
             title="Read Project Documentation",
-            description=f"Start with README.md to understand the setup and design guidelines of this {repo_type}."
+            description=f"Start with README.md to understand the setup and design guidelines of this {repo_type}.",
         ),
         RoadmapStep(
             step_number=2,
             title="Explore Configuration Files",
-            description="Examine package.json, requirements.txt, or other config files to understand the dependencies."
-        )
+            description="Examine package.json, requirements.txt, or other config files to understand the dependencies.",
+        ),
     ]
 
     desc = github_meta["description"] if github_meta["description"] else parser_info["description"]
@@ -121,7 +117,7 @@ async def analyze_repository(payload: AnalyzeRequest):
                 confidence=t["confidence"],
                 evidence=t["evidence"],
                 coverage=t["coverage"],
-                version=t["version"]
+                version=t["version"],
             )
             for t in detected_tech
         ],
@@ -137,7 +133,7 @@ async def analyze_repository(payload: AnalyzeRequest):
                 provider=f.get("provider"),
                 model=f.get("model"),
                 files_count=f.get("files_count", 0),
-                size_bytes=f.get("size_bytes", 0)
+                size_bytes=f.get("size_bytes", 0),
             )
             for f in rich_folders
         ],
@@ -145,8 +141,22 @@ async def analyze_repository(payload: AnalyzeRequest):
         stars=github_meta["stars"],
         forks=github_meta["forks"],
         watchers=github_meta["watchers"],
-        updated_at=github_meta["updated_at"]
+        updated_at=github_meta["updated_at"],
     )
+
+
+@router.post("/analyze", response_model=AnalyzeResponse)
+async def analyze_repository(payload: AnalyzeRequest):
+    """
+    Analyzes a GitHub repository URL: validates and clones the repository,
+    and returns a summary, tech stack, folder explanation, onboarding roadmap,
+    and clone metadata.
+    """
+    try:
+        return await asyncio.to_thread(_analyze_repository_sync, payload.repo_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.get("/graph", response_model=GraphResponse)
 async def get_repository_graph(repo_url: str):
@@ -155,24 +165,24 @@ async def get_repository_graph(repo_url: str):
     Reads directly from the cached engine index.
     """
     try:
-        # Resolve target clone path based on the validated URL
-        owner, repo_name = repository_service._validate_and_parse_url(repo_url)
-        import tempfile
-        from pathlib import Path
-        temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
-        local_clone_path = temp_dir / f"{owner}_{repo_name}"
-        
+        local_clone_path = repository_service.resolve_clone_path(repo_url)
+
         if not local_clone_path.exists():
-            raise HTTPException(status_code=404, detail="Repository must be analyzed first before querying its graph.")
-            
-        rke_index = repository_knowledge_engine.get_index(str(local_clone_path))
+            raise HTTPException(
+                status_code=404,
+                detail="Repository must be analyzed first before querying its graph.",
+            )
+
+        rke_index = await asyncio.to_thread(
+            repository_knowledge_engine.get_index, str(local_clone_path)
+        )
         return GraphResponse(
             repository=rke_index["repository"],
             generated_at=rke_index["generated_at"],
             graph={
                 "nodes": rke_index["graph"]["nodes"],
                 "edges": rke_index["graph"]["edges"],
-                "adjacency_map": rke_index["graph"]["adjacency_map"]
+                "adjacency_map": rke_index["graph"]["adjacency_map"],
             },
             brain={
                 "languages": rke_index["brain"]["languages"],
@@ -180,11 +190,12 @@ async def get_repository_graph(repo_url: str):
                 "entry_points": rke_index["brain"]["entry_points"],
                 "largest_folder": rke_index["brain"]["largest_folder"],
                 "top_symbols": rke_index["brain"]["top_symbols"],
-                "most_imported_module": rke_index["brain"]["most_imported_module"]
-            }
+                "most_imported_module": rke_index["brain"]["most_imported_module"],
+            },
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve graph index: {str(e)}")
-

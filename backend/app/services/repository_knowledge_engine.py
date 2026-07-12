@@ -45,6 +45,23 @@ IGNORE_DIRECTORIES = {
     "target"
 }
 
+# Cap AST parsing so large repos (e.g. microsoft/vscode) finish in reasonable time.
+MAX_FILES_TO_PARSE = 200
+MAX_GRAPH_FILES = 1500
+PRIORITY_PATH_SEGMENTS = ("src", "lib", "app", "packages", "components", "api", "core", "server")
+PRIORITY_ROOT_FILES = {
+    "README.md", "package.json", "tsconfig.json", "main.py", "index.ts", "index.js",
+    "Cargo.toml", "go.mod", "pyproject.toml",
+}
+
+EMPTY_IR = {
+    "symbols": [],
+    "imports": [],
+    "calls": [],
+    "components": [],
+    "routes": [],
+}
+
 # Predefined templates from previous FolderExplanationService for clean O(1) matching in RKE summary
 FOLDER_TEMPLATES = {
     ".devcontainer": {
@@ -362,19 +379,31 @@ class RepositoryKnowledgeEngine:
         except Exception:
             return ""
 
+    def _prioritize_files_for_parsing(self, rel_paths: List[str]) -> List[str]:
+        """Rank files so entry points and core source paths are parsed first."""
+        def score(rel_path: str) -> tuple:
+            name = Path(rel_path).name
+            parts = rel_path.replace("\\", "/").lower().split("/")
+            is_priority_root = name in PRIORITY_ROOT_FILES
+            has_priority_segment = any(seg in PRIORITY_PATH_SEGMENTS for seg in parts)
+            depth = len(parts)
+            return (
+                0 if is_priority_root else 1,
+                0 if has_priority_segment else 1,
+                depth,
+                rel_path,
+            )
+
+        return sorted(rel_paths, key=score)
+
+    def _apply_empty_ir(self, index: Dict[str, Any], rel_path: str) -> None:
+        for key, value in EMPTY_IR.items():
+            index["files"][rel_path][key] = list(value)
+
     def _is_typescript_installed(self, root_path: Path) -> bool:
-        # Check local node_modules in the repo itself
+        # Only use AST parsing when the cloned repo itself ships TypeScript.
         ts_dir = root_path / "node_modules" / "typescript"
-        if ts_dir.exists() and ts_dir.is_dir():
-            return True
-        # Fallback: check workspace parent directories (contains node_modules in the app root)
-        parent = Path(__file__).parent.resolve()
-        for _ in range(5):
-            parent_ts_dir = parent / "node_modules" / "typescript"
-            if parent_ts_dir.exists() and parent_ts_dir.is_dir():
-                return True
-            parent = parent.parent
-        return False
+        return ts_dir.exists() and ts_dir.is_dir()
 
     def get_index(self, local_path: str) -> Dict[str, Any]:
         """
@@ -448,15 +477,19 @@ class RepositoryKnowledgeEngine:
         use_ts_ast = self._is_typescript_installed(root)
         ts_parser_path = Path(__file__).parent.parent / "utils" / "ts_parser.js"
 
+        if len(files_to_parse) > MAX_FILES_TO_PARSE:
+            prioritized = self._prioritize_files_for_parsing(files_to_parse)
+            parse_batch = set(prioritized[:MAX_FILES_TO_PARSE])
+            for rel_path in files_to_parse:
+                if rel_path not in parse_batch:
+                    self._apply_empty_ir(index, rel_path)
+            files_to_parse = [rel_path for rel_path in prioritized if rel_path in parse_batch]
+
         for rel_path in files_to_parse:
             meta = index["files"][rel_path]
             abs_path = meta["abs_path"]
-            
-            # Hash (Step 1)
-            file_hash = self._calculate_sha256(Path(abs_path))
-            index["files"][rel_path]["hash"] = file_hash
-            
-            # Run parser and retrieve standard IR
+
+            # Run parser and retrieve standard IR (mtime/size already tracked for cache)
             ir_result = self._parse_file_ir(Path(abs_path), meta["language"], use_ts_ast, ts_parser_path)
             index["files"][rel_path]["symbols"] = ir_result["symbols"]
             index["files"][rel_path]["imports"] = ir_result["imports"]
@@ -509,7 +542,12 @@ class RepositoryKnowledgeEngine:
             # 3. Fallback: file node UUID
             return str(uuid.uuid5(RKE_NAMESPACE, f"file:{repo_name}:{caller_rel}"))
 
-        for rel_path, file_meta in index["files"].items():
+        graph_files = self._prioritize_files_for_parsing(list(index["files"].keys()))
+        if len(graph_files) > MAX_GRAPH_FILES:
+            graph_files = graph_files[:MAX_GRAPH_FILES]
+
+        for rel_path in graph_files:
+            file_meta = index["files"][rel_path]
             file_uuid = str(uuid.uuid5(RKE_NAMESPACE, f"file:{repo_name}:{rel_path}"))
             
             # Register directories
@@ -985,7 +1023,7 @@ class RepositoryKnowledgeEngine:
                     ["node", str(ts_parser_path), str(file_path)],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=2
                 )
                 if proc.returncode == 0:
                     data = json.loads(proc.stdout.strip())
@@ -1184,13 +1222,20 @@ class RepositoryKnowledgeEngine:
             "routes": routes
         }
 
-    def get_folder_summary(self, local_path: str, folder_rel: str, tech_stack: List[str]) -> Dict[str, Any]:
+    def get_folder_summary(
+        self,
+        local_path: str,
+        folder_rel: str,
+        tech_stack: List[str],
+        index: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Decoupled folder mapping. Resolves files and directory statistics directly
         from the index. Matches standard definitions using static templates.
         No intelligence layer is used in Phase 5.1.
         """
-        index = self.get_index(local_path)
+        if index is None:
+            index = self.get_index(local_path)
         folder_clean = folder_rel.strip("/").replace("\\", "/")
         
         real_files = []

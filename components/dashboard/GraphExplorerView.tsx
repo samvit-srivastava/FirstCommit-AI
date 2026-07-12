@@ -90,6 +90,8 @@ export function GraphExplorerView() {
     
     // Log the selected node ID and type for verification audit
     console.log(`[GraphExplorer] Selected Node: Name="${node.name}", ID="${node.id}", Type="${node.type}"`);
+  };
+
   // Effect to handle navigation from other views (auto select/scroll)
   useEffect(() => {
     if (selectedNodeId && data?.graph.nodes) {
@@ -114,10 +116,8 @@ export function GraphExplorerView() {
   // Effect to automatically switch activeTab based on node type
   useEffect(() => {
     if (!selectedNode) return;
-    
 
-
-    const nodeType = node.type.toLowerCase();
+    const nodeType = selectedNode.type.toLowerCase();
     if (nodeType === "file") {
       setActiveTab("imports");
     } else if (nodeType === "function" || nodeType === "class") {
@@ -129,7 +129,7 @@ export function GraphExplorerView() {
     } else {
       setActiveTab("overview");
     }
-  };
+  }, [selectedNode]);
 
   // Expandable relationship group states
   const [outgoingExpanded, setOutgoingExpanded] = useState(true);
