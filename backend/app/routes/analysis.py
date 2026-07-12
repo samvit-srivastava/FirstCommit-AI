@@ -51,6 +51,9 @@ async def analyze_repository(payload: AnalyzeRequest):
             repository_knowledge_engine.get_folder_summary(clone_info["local_clone_path"], f["name"], tech_names)
             for f in parser_info["top_level_folders"]
         ]
+        
+        # Fetch live GitHub API metadata
+        github_meta = repository_service.get_github_metadata(payload.repo_url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -86,17 +89,20 @@ async def analyze_repository(payload: AnalyzeRequest):
         )
     ]
 
+    desc = github_meta["description"] if github_meta["description"] else parser_info["description"]
+    branch = github_meta["default_branch"] if github_meta["default_branch"] else clone_info["default_branch"]
+
     return AnalyzeResponse(
-        summary=parser_info["description"],
+        summary=desc,
         tech_stack=tech_stack,
         folder_explanation=folder_explanation,
         roadmap=roadmap,
         repository_name=clone_info["repository_name"],
-        default_branch=clone_info["default_branch"],
+        default_branch=branch,
         local_clone_path=clone_info["local_clone_path"],
         clone_status=clone_info["clone_status"],
         project_name=parser_info["project_name"],
-        description=parser_info["description"],
+        description=desc,
         repository_type=repo_type,
         detected_frameworks=parser_info["detected_frameworks"],
         detected_languages=parser_info["detected_languages"],
@@ -137,7 +143,11 @@ async def analyze_repository(payload: AnalyzeRequest):
             )
             for f in rich_folders
         ],
-        readme=parser_info.get("readme", "")
+        readme=parser_info.get("readme", ""),
+        stars=github_meta["stars"],
+        forks=github_meta["forks"],
+        watchers=github_meta["watchers"],
+        updated_at=github_meta["updated_at"]
     )
 
 @router.post("/chat", response_model=ChatResponse)

@@ -27,6 +27,77 @@ const MOCK_ANSWERS: Record<string, { content: string; files: string[] }> = {
   },
 };
 
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      soundManager.playSuccess();
+    } catch (err) {
+      console.error("Failed to copy code: ", err);
+    }
+  };
+
+  return (
+    <div className="my-3 rounded-xl overflow-hidden border border-border/30 bg-[#020617] font-mono text-xs sm:text-[13px] relative shadow-lg">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 bg-secondary/10 text-muted-foreground/70 text-[10px] uppercase tracking-wider select-none">
+        <span>{language || "code"}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded bg-secondary/20 hover:bg-secondary/45 border border-border/20 flex items-center gap-1 text-[9px]"
+        >
+          {copied ? "Copied!" : "Copy Code"}
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto text-foreground/90 max-h-[300px] leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(`[^`]+`)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={idx} className="bg-secondary/50 border border-border/35 rounded px-1.5 py-0.5 font-mono text-xs text-primary font-bold">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2.5 select-text">
+      {parts.map((part, index) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          const match = part.match(/```(\w*)\n([\s\S]*?)```/);
+          const language = match ? match[1] : "code";
+          const code = match ? match[2].trim() : part.slice(3, -3).trim();
+
+          return <CodeBlock key={index} code={code} language={language} />;
+        }
+
+        return (
+          <p key={index} className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+            {renderInlineMarkdown(part)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AskRepoChatView() {
   const { data } = useAnalysisData();
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -195,15 +266,19 @@ export function AskRepoChatView() {
                   </div>
 
                   {/* Message bubble context */}
-                  <div className="space-y-3">
+                  <div className="space-y-3 flex-1">
                     <div 
-                      className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                      className={`p-4 rounded-2xl leading-relaxed ${
                         isAssistant
                           ? "bg-secondary/15 border border-border/40 text-foreground"
-                          : "bg-primary text-white font-medium"
+                          : "bg-primary text-white font-medium text-xs sm:text-sm"
                       }`}
                     >
-                      {msg.content}
+                      {isAssistant ? (
+                        <MarkdownMessage content={msg.content} />
+                      ) : (
+                        msg.content
+                      )}
                     </div>
 
                     {/* Referenced diagnostic files list */}

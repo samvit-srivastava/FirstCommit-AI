@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   BookOpen,
-  Code2,
-  FolderTree,
   Map,
   MessageSquare,
   ChevronsLeft,

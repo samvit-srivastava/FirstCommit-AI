@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Network,
@@ -74,6 +74,23 @@ export function GraphExplorerView() {
   const [filterType, setFilterType] = useState("all");
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "calls" | "imports" | "components" | "routes" | "neighbors">("overview");
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.key === "/" || (e.ctrlKey && e.key === "k")) &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Effect to automatically switch activeTab based on node type
   useEffect(() => {
@@ -357,11 +374,12 @@ export function GraphExplorerView() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Search symbols, files, routes..."
+                  placeholder="Search symbols, files, routes... (Press / to focus)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-secondary/40 text-xs rounded-lg pl-8 pr-3 py-2 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground"
+                  className="w-full bg-secondary/40 text-xs rounded-lg pl-8 pr-3 py-2 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
                 />
               </div>
 

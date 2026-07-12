@@ -4,6 +4,10 @@ export interface ProjectSummary {
   purpose: string;
   architecture: string;
   stars: number;
+  forks?: number;
+  watchers?: number;
+  default_branch?: string;
+  updated_at?: string;
   language: string;
   url: string;
 }

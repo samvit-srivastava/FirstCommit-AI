@@ -197,3 +197,39 @@ class RepositoryService:
         except Exception:
             pass
         return "main"
+
+    def get_github_metadata(self, repo_url: str) -> dict:
+        """
+        Fetches live GitHub metadata using the public API.
+        """
+        try:
+            owner, repo_name = self._validate_and_parse_url(repo_url)
+            import urllib.request
+            import json
+            
+            api_url = f"https://api.github.com/repos/{owner}/{repo_name}"
+            req = urllib.request.Request(
+                api_url, 
+                headers={"User-Agent": "FirstCommit-AI-Agent"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                return {
+                    "stars": data.get("stargazers_count", 0),
+                    "forks": data.get("forks_count", 0),
+                    "watchers": data.get("watchers_count", 0),
+                    "language": data.get("language", "TypeScript"),
+                    "default_branch": data.get("default_branch", "main"),
+                    "description": data.get("description", ""),
+                    "updated_at": data.get("updated_at", "")
+                }
+        except Exception:
+            return {
+                "stars": 0,
+                "forks": 0,
+                "watchers": 0,
+                "language": "",
+                "default_branch": "main",
+                "description": "",
+                "updated_at": ""
+            }

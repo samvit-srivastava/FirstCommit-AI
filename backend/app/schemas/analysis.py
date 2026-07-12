@@ -68,6 +68,10 @@ class AnalyzeResponse(BaseModel):
     technologies: List[DetailedTechItem]
     folders: List[FolderExplanationRichItem]
     readme: Optional[str] = None
+    stars: Optional[int] = 0
+    forks: Optional[int] = 0
+    watchers: Optional[int] = 0
+    updated_at: Optional[str] = ""
 
 class ChatRequest(BaseModel):
     repo_id: str
