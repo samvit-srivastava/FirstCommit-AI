@@ -12,6 +12,7 @@ import {
   ChevronsRight,
   GitBranch,
   X,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
@@ -19,9 +20,8 @@ import { APP_NAME } from "@/lib/constants";
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "summary", label: "Summary", icon: BookOpen },
-  { id: "techstack", label: "Tech Stack", icon: Code2 },
-  { id: "folders", label: "Folders", icon: FolderTree },
   { id: "roadmap", label: "Roadmap", icon: Map },
+  { id: "graph", label: "Graph Explorer", icon: Network },
   { id: "chat", label: "Ask Repo", icon: MessageSquare },
 ] as const;
 

@@ -184,7 +184,7 @@ export function TechStackView() {
                   {/* Skill level / Codebase coverage progress indicator */}
                   <div className="p-4 pt-0 space-y-1">
                     <div className="flex justify-between items-center text-[10px] font-semibold text-muted-foreground">
-                      <span>Codebase Coverage</span>
+                      <span>Framework Coverage</span>
                       <span className="text-foreground">{item.coverage}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-secondary/50 rounded-full overflow-hidden">
@@ -207,7 +207,7 @@ export function TechStackView() {
       <div className="flex items-start gap-2.5 rounded-xl border border-border/30 bg-secondary/25 p-4 text-xs text-muted-foreground max-w-2xl">
         <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
         <p className="leading-relaxed">
-          The coverage bar visualizes the usage density of each framework, utility, or parser computed by scanning imports, configurations, and lockfiles across this codebase.
+          The coverage bar represents file-based detection coverage rather than language distribution. Specifically, language coverage represents the ratio of files in that language, whereas framework coverage shows the percentage of JS/TS files that import or utilize the framework.
         </p>
       </div>
     </div>

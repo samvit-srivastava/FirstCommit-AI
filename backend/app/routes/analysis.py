@@ -11,6 +11,7 @@ from app.schemas.analysis import (
     TopLevelFolderItem,
     DetailedTechItem,
     FolderExplanationRichItem,
+    GraphResponse,
 )
 from app.services import (
     RepositoryService,
@@ -158,3 +159,44 @@ async def chat_with_repository(payload: ChatRequest):
             "backend/app/routes/analysis.py"
         ]
     )
+
+@router.get("/graph", response_model=GraphResponse)
+async def get_repository_graph(repo_url: str):
+    """
+    Exposes the unified knowledge graph and brain summary for a repository.
+    Reads directly from the cached engine index.
+    """
+    try:
+        # Resolve target clone path based on the validated URL
+        owner, repo_name = repository_service._validate_and_parse_url(repo_url)
+        import tempfile
+        from pathlib import Path
+        temp_dir = Path(tempfile.gettempdir()) / "firstcommit_ai"
+        local_clone_path = temp_dir / f"{owner}_{repo_name}"
+        
+        if not local_clone_path.exists():
+            raise HTTPException(status_code=404, detail="Repository must be analyzed first before querying its graph.")
+            
+        rke_index = repository_knowledge_engine.get_index(str(local_clone_path))
+        return GraphResponse(
+            repository=rke_index["repository"],
+            generated_at=rke_index["generated_at"],
+            graph={
+                "nodes": rke_index["graph"]["nodes"],
+                "edges": rke_index["graph"]["edges"],
+                "adjacency_map": rke_index["graph"]["adjacency_map"]
+            },
+            brain={
+                "languages": rke_index["brain"]["languages"],
+                "frameworks": rke_index["brain"]["frameworks"],
+                "entry_points": rke_index["brain"]["entry_points"],
+                "largest_folder": rke_index["brain"]["largest_folder"],
+                "top_symbols": rke_index["brain"]["top_symbols"],
+                "most_imported_module": rke_index["brain"]["most_imported_module"]
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve graph index: {str(e)}")
+
