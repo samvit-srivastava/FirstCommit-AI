@@ -20,7 +20,7 @@ import { useState } from "react";
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "summary", label: "Summary", icon: BookOpen },
-  { id: "roadmap", label: "Roadmap", icon: Map },
+  { id: "roadmap", label: "Setup Guide", icon: Map },
   { id: "graph", label: "Graph Explorer", icon: Network },
   { id: "intelligence", label: "Repository Intelligence", icon: Cpu },
 ] as const;

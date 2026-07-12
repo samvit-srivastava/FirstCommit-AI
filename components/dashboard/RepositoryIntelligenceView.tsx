@@ -20,6 +20,10 @@ import {
   ZoomIn,
   ZoomOut,
   Loader2,
+  Network,
+  Terminal,
+  HelpCircle,
+  TrendingUp,
 } from "lucide-react";
 import { useAnalysis } from "@/lib/AnalysisContext";
 import { soundManager } from "@/lib/sounds";
@@ -76,6 +80,7 @@ export function RepositoryIntelligenceView() {
   // Tab 1: Locator State
   const [locatorQuery, setLocatorQuery] = useState("");
   const [locatorResults, setLocatorResults] = useState<GraphNode[]>([]);
+  const [isFallbackResult, setIsFallbackResult] = useState(false);
   const locatorInputRef = useRef<HTMLInputElement>(null);
 
   // Tab 2: Architecture State
@@ -89,7 +94,8 @@ export function RepositoryIntelligenceView() {
   // Tab 3: Dependency Explorer State
   const [depSearchQuery, setDepSearchQuery] = useState("");
   const [selectedDepNode, setSelectedDepNode] = useState<GraphNode | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [dependsOnExpanded, setDependsOnExpanded] = useState(true);
+  const [usedByExpanded, setUsedByExpanded] = useState(true);
 
   // 1. Fetch Graph Cache Data
   useEffect(() => {
@@ -131,6 +137,7 @@ export function RepositoryIntelligenceView() {
             flowchart: {
               useMaxWidth: false,
               htmlLabels: true,
+              curve: "basis",
             },
           });
           setMermaidInstance(m.default);
@@ -162,6 +169,7 @@ export function RepositoryIntelligenceView() {
       if (e.key === "Escape" && activeTab === "locator" && document.activeElement === locatorInputRef.current) {
         setLocatorQuery("");
         setLocatorResults([]);
+        setIsFallbackResult(false);
         locatorInputRef.current?.blur();
       }
     };
@@ -170,63 +178,89 @@ export function RepositoryIntelligenceView() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab]);
 
+  // Natural Language Query Filter
+  const cleanQuery = (query: string): string => {
+    const fillers = ["where", "is", "the", "show", "find", "locate", "a", "an", "what", "how", "to", "of", "in", "by"];
+    const words = query.toLowerCase().split(/\s+/);
+    const meaningful = words.filter((w) => !fillers.includes(w));
+    return meaningful.join(" ").trim();
+  };
+
   // Fuzzy Search Resolver (Tab 1: Where is X?)
   const handleLocatorSearch = (queryStr: string) => {
     if (!data?.graph.nodes) return;
-    const cleanQuery = queryStr.trim().toLowerCase();
-    if (!cleanQuery) {
+    const cleanSearch = cleanQuery(queryStr);
+    if (!cleanSearch) {
       setLocatorResults([]);
+      setIsFallbackResult(false);
       return;
     }
 
     soundManager.playClick();
 
     // Matching Algorithm
-    const scored = data.graph.nodes
-      .map((node) => {
-        let score = 0;
-        const nameLower = node.name.toLowerCase();
-        const locLower = node.location.toLowerCase();
-        const typeLower = node.type.toLowerCase();
+    const scored = data.graph.nodes.map((node) => {
+      let score = 0;
+      const nameLower = node.name.toLowerCase();
+      const locLower = node.location.toLowerCase();
+      const typeLower = node.type.toLowerCase();
 
-        // 1. Exact Name match
-        if (nameLower === cleanQuery) {
-          score += 1500;
+      // Exact match priorities
+      const isExactSymbol = nameLower === cleanSearch && !["file", "folder", "route"].includes(typeLower);
+      const isExactFile = nameLower === cleanSearch && typeLower === "file";
+      const isExactRoute = nameLower === cleanSearch && typeLower === "route";
+
+      if (isExactSymbol) {
+        score += 12000;
+      } else if (isExactFile) {
+        score += 10000;
+      } else if (isExactRoute) {
+        score += 8000;
+      }
+
+      // Partial matches
+      if (nameLower.includes(cleanSearch)) {
+        score += 3000;
+      }
+      if (locLower.includes(cleanSearch)) {
+        score += 1500;
+      }
+
+      // Subsequence split matches
+      const terms = cleanSearch.split(/\s+/);
+      let matches = 0;
+      terms.forEach((t) => {
+        if (nameLower.includes(t) || locLower.includes(t)) {
+          matches++;
         }
-        // 2. Substring Name match
-        else if (nameLower.includes(cleanQuery)) {
-          score += 600;
-        }
-        // 3. Substring Location match
-        if (locLower.includes(cleanQuery)) {
-          score += 300;
-        }
-        // 4. Type match
-        if (typeLower.includes(cleanQuery)) {
-          score += 150;
-        }
+      });
+      score += matches * 250;
 
-        const words = cleanQuery.split(/\s+/);
-        let wordMatches = 0;
-        words.forEach((w) => {
-          if (nameLower.includes(w) || locLower.includes(w)) {
-            wordMatches++;
-          }
-        });
-        score += wordMatches * 100;
+      // Centrality degree & Importance score
+      const degree = data.graph.adjacency_map[node.id]?.length || 0;
+      score += (node.importance_score || 0) * 180;
+      score += degree * 12;
 
-        const degree = data.graph.adjacency_map[node.id]?.length || 0;
-        score += (node.importance_score || 0) * 120;
-        score += degree * 15;
+      const hasMatch = matches > 0 || isExactSymbol || isExactFile || isExactRoute || nameLower.includes(cleanSearch) || locLower.includes(cleanSearch);
 
-        return { node, score };
-      })
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map((item) => item.node)
-      .slice(0, 10);
+      return { node, score, hasMatch };
+    });
 
-    setLocatorResults(scored);
+    const matches = scored.filter((item) => item.score > 200 && item.hasMatch);
+
+    if (matches.length > 0) {
+      const sortedMatches = matches.sort((a, b) => b.score - a.score).map((item) => item.node);
+      setLocatorResults(sortedMatches.slice(0, 6));
+      setIsFallbackResult(false);
+    } else {
+      // Fallback: take top 3 closest items in repository
+      const sortedClosest = scored
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map((item) => item.node);
+      setLocatorResults(sortedClosest);
+      setIsFallbackResult(true);
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -240,14 +274,51 @@ export function RepositoryIntelligenceView() {
     router.push("/dashboard/graph");
   };
 
-  // Tab 2: Mermaid Code Builder Memo
+  // Node Description Generator
+  const getNodeDescription = (node: GraphNode): string => {
+    const type = node.type.toLowerCase();
+    if (type === "component") {
+      return "Component module orchestrating UI rendering elements.";
+    }
+    if (type === "file") {
+      return "Project source module defining exports and references.";
+    }
+    if (type === "route") {
+      return "Active HTTP request path handled by codebase router.";
+    }
+    if (type === "function") {
+      return "Functional execution helper or module callback.";
+    }
+    if (type === "class") {
+      return "Workspace class entity definition structures.";
+    }
+    if (type === "folder") {
+      return "Root path segment dividing project sections.";
+    }
+    return "Repository index parameter node.";
+  };
+
+  // Tab 2: Architecture Diagram Builder
   const mermaidCode = useMemo(() => {
     if (!data?.graph.nodes) return "";
 
     const nodes = data.graph.nodes;
     const edges = data.graph.edges;
 
-    const frontendNodes = nodes
+    // Filtration: remove noise (css, readmes, constants, icons, favicon)
+    const ignoreKeywords = [".css", "readme.md", "favicon", "assets", ".json", "config", "types", "constants", "icon", "node_modules", ".git"];
+    const allowedKeywords = ["page", "layout", "provider", "component", "service", "controller", "parser", "engine", "route", "api", "db", "database", "github", "view", "context"];
+
+    const architecturalNodes = nodes.filter((n) => {
+      const name = n.name.toLowerCase();
+      const loc = n.location.toLowerCase();
+      if (ignoreKeywords.some((kw) => name.includes(kw) || loc.includes(kw))) {
+        return false;
+      }
+      return allowedKeywords.some((kw) => name.includes(kw) || loc.includes(kw) || n.type.toLowerCase().includes(kw));
+    });
+
+    const frontendNodes = architecturalNodes
       .filter(
         (n) =>
           n.type === "Route" ||
@@ -259,14 +330,15 @@ export function RepositoryIntelligenceView() {
       )
       .slice(0, 10);
 
-    const backendNodes = nodes
+    const backendNodes = architecturalNodes
       .filter(
         (n) =>
           n.name.toLowerCase().includes("service") ||
           n.name.toLowerCase().includes("parser") ||
           n.name.toLowerCase().includes("engine") ||
           n.location.toLowerCase().includes("backend/") ||
-          n.location.toLowerCase().includes("routes/")
+          n.location.toLowerCase().includes("routes/") ||
+          n.location.toLowerCase().includes("api/")
       )
       .slice(0, 10);
 
@@ -280,12 +352,13 @@ export function RepositoryIntelligenceView() {
           e.relation !== "CONTAINS" &&
           e.relation !== "BELONGS_TO"
       )
-      .slice(0, 20);
+      .slice(0, 15);
 
+    // If empty fallback
     if (frontendNodes.length === 0 && backendNodes.length === 0) {
       const topNodes = [...nodes]
         .sort((a, b) => (b.importance_score || 0) - (a.importance_score || 0))
-        .slice(0, 12);
+        .slice(0, 10);
       const topIds = new Set(topNodes.map((n) => n.id));
       const topEdges = edges
         .filter(
@@ -295,14 +368,14 @@ export function RepositoryIntelligenceView() {
             e.relation !== "CONTAINS" &&
             e.relation !== "BELONGS_TO"
         )
-        .slice(0, 12);
+        .slice(0, 10);
 
-      let fallbackCode = "graph TD\n";
-      fallbackCode += "  classDef nodeStyle fill:#8B5CF620,stroke:#8B5CF6,stroke-width:1px,color:#fff;\n";
+      let fallbackCode = "graph LR\n";
+      fallbackCode += "  classDef fallback fill:#7C5CFF10,stroke:#7C5CFF,stroke-width:1px,color:#fff;\n";
       topNodes.forEach((n) => {
         const label = n.name.replace(/[\[\]\(\)\{\}]/g, "");
-        fallbackCode += `  ${n.id}["${label} (${n.type})"]\n`;
-        fallbackCode += `  class ${n.id} nodeStyle;\n`;
+        fallbackCode += `  ${n.id}("${label} (${n.type})")\n`;
+        fallbackCode += `  class ${n.id} fallback;\n`;
       });
       topEdges.forEach((e) => {
         fallbackCode += `  ${e.source} --> ${e.target}\n`;
@@ -310,15 +383,16 @@ export function RepositoryIntelligenceView() {
       return fallbackCode;
     }
 
-    let code = "graph TD\n";
-    code += "  classDef frontend fill:#3b82f620,stroke:#3b82f6,stroke-width:1px,color:#fff;\n";
-    code += "  classDef backend fill:#10b98120,stroke:#10b981,stroke-width:1px,color:#fff;\n";
-    code += "  classDef route fill:#8b5cf620,stroke:#8b5cf6,stroke-width:1px,color:#fff;\n";
+    // Generate Left-to-Right System Diagram
+    let code = "graph LR\n";
+    code += "  classDef frontend fill:#3b82f610,stroke:#3b82f6,stroke-width:1px,color:#fff;\n";
+    code += "  classDef backend fill:#10b98110,stroke:#10b981,stroke-width:1px,color:#fff;\n";
+    code += "  classDef route fill:#8b5cf610,stroke:#8b5cf6,stroke-width:1px,color:#fff;\n";
 
     code += "  subgraph Frontend\n";
     frontendNodes.forEach((n) => {
       const label = n.name.replace(/[\[\]\(\)\{\}]/g, "");
-      code += `    ${n.id}["${label}"]\n`;
+      code += `    ${n.id}("${label}")\n`;
       if (n.type === "Route") {
         code += `    class ${n.id} route;\n`;
       } else {
@@ -330,7 +404,7 @@ export function RepositoryIntelligenceView() {
     code += "  subgraph Backend\n";
     backendNodes.forEach((n) => {
       const label = n.name.replace(/[\[\]\(\)\{\}]/g, "");
-      code += `    ${n.id}["${label}"]\n`;
+      code += `    ${n.id}("${label}")\n`;
       code += `    class ${n.id} backend;\n`;
     });
     code += "  end\n";
@@ -355,10 +429,10 @@ export function RepositoryIntelligenceView() {
           })
           .catch((err: any) => {
             console.error(err);
-            setMermaidError("Failed to parse and render architectural flow diagram.");
+            setMermaidError("Failed to parse and render system flow diagram.");
           });
       } catch (err: any) {
-        setMermaidError("Failed to render Mermaid layout.");
+        setMermaidError("Failed to compile layout.");
       }
     }
   }, [activeTab, mermaidInstance, mermaidCode]);
@@ -392,7 +466,7 @@ export function RepositoryIntelligenceView() {
     }
   };
 
-  // Tab 3: Dependency Explorer Tree Builder
+  // Tab 3: Dependency Explorer Filtering
   const filteredNodesForDep = useMemo(() => {
     if (!data?.graph.nodes) return [];
     const query = depSearchQuery.toLowerCase().trim();
@@ -402,82 +476,29 @@ export function RepositoryIntelligenceView() {
       .slice(0, 5);
   }, [depSearchQuery, data]);
 
-  const toggleExpand = (nodeId: string) => {
-    setExpandedNodes((prev) => ({
-      ...prev,
-      [nodeId]: !prev[nodeId],
-    }));
-  };
+  // Depends On List (outgoing relations)
+  const dependsOnList = useMemo(() => {
+    if (!selectedDepNode || !data?.graph.edges) return [];
+    return data.graph.edges
+      .filter((e) => e.source === selectedDepNode.id && e.relation !== "CONTAINS" && e.relation !== "BELONGS_TO")
+      .map((e) => {
+        const targetNode = data.graph.nodes.find((n) => n.id === e.target);
+        return { edge: e, node: targetNode };
+      })
+      .filter((item) => item.node !== undefined) as Array<{ edge: GraphEdge; node: GraphNode }>;
+  }, [selectedDepNode, data]);
 
-  const DependencyTreeBranch = ({ nodeId, depth = 0 }: { nodeId: string; depth: number }) => {
-    const node = data?.graph.nodes.find((n) => n.id === nodeId);
-    const isExpanded = !!expandedNodes[nodeId];
-
-    const dependencies = useMemo(() => {
-      if (!data?.graph.edges || depth >= 3) return [];
-      return data.graph.edges
-        .filter((e) => e.source === nodeId && e.relation !== "CONTAINS" && e.relation !== "BELONGS_TO")
-        .map((e) => ({
-          targetId: e.target,
-          relation: e.relation,
-          id: e.id,
-        }));
-    }, [nodeId, depth]);
-
-    if (!node) return null;
-
-    const hasDeps = dependencies.length > 0;
-
-    return (
-      <div className="pl-4 border-l border-white/5 space-y-1.5 mt-1 font-mono">
-        <div className="flex items-center gap-2 text-xs py-1">
-          {hasDeps ? (
-            <button
-              type="button"
-              onClick={() => toggleExpand(nodeId)}
-              className="text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none"
-            >
-              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </button>
-          ) : (
-            <span className="w-3" />
-          )}
-
-          <span className="text-muted-foreground/35 select-none">{depth > 0 ? "↳" : "•"}</span>
-
-          <span className="text-foreground font-semibold">{node.name}</span>
-          <span className="text-[9px] uppercase tracking-wider bg-white/[0.03] border border-white/5 text-muted-foreground px-1.5 py-0.5 rounded font-sans">
-            {node.type}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => handleOpenInGraph(node.id)}
-            className="text-primary hover:text-[#00FFC6] text-[10px] hover:underline flex items-center gap-0.5 cursor-pointer ml-3 font-sans"
-          >
-            Open <ExternalLink className="h-2.5 w-2.5" />
-          </button>
-        </div>
-
-        {isExpanded && hasDeps && (
-          <div className="space-y-1">
-            {dependencies.map((dep) => {
-              const targetNode = data?.graph.nodes.find((n) => n.id === dep.targetId);
-              if (!targetNode) return null;
-              return (
-                <div key={dep.id} className="pl-4">
-                  <div className="text-[10px] text-muted-foreground/50 italic flex items-center gap-1">
-                    <span>{dep.relation.toLowerCase()}</span>
-                  </div>
-                  <DependencyTreeBranch nodeId={dep.targetId} depth={depth + 1} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Used By / Imported By List (incoming relations)
+  const usedByList = useMemo(() => {
+    if (!selectedDepNode || !data?.graph.edges) return [];
+    return data.graph.edges
+      .filter((e) => e.target === selectedDepNode.id && e.relation !== "CONTAINS" && e.relation !== "BELONGS_TO")
+      .map((e) => {
+        const sourceNode = data.graph.nodes.find((n) => n.id === e.source);
+        return { edge: e, node: sourceNode };
+      })
+      .filter((item) => item.node !== undefined) as Array<{ edge: GraphEdge; node: GraphNode }>;
+  }, [selectedDepNode, data]);
 
   if (loading) {
     return (
@@ -511,13 +532,13 @@ export function RepositoryIntelligenceView() {
 
   return (
     <div className="space-y-10 max-w-7xl mx-auto pb-24 select-none">
-      {/* 1. Top Hero */}
+      {/* 1. Header Hero */}
       <div className="space-y-3">
         <h1 className="text-2xl font-heading font-black tracking-tight text-foreground sm:text-3xl flex items-center gap-3">
           <Cpu className="h-7 w-7 text-primary" />
           Repository Intelligence
         </h1>
-        <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+        <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed font-sans font-medium">
           Understand large repositories through architecture, dependencies and intelligent navigation.
         </p>
       </div>
@@ -540,7 +561,7 @@ export function RepositoryIntelligenceView() {
               }}
               className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-150 cursor-pointer ${
                 isActive
-                  ? "bg-primary text-white shadow-lg"
+                  ? "bg-primary text-white shadow-lg shadow-primary/10"
                   : "text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.02]"
               }`}
             >
@@ -550,7 +571,7 @@ export function RepositoryIntelligenceView() {
         })}
       </div>
 
-      {/* 3. Lazy Tab Views Container */}
+      {/* 3. Lazy Tab Views */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
@@ -564,17 +585,16 @@ export function RepositoryIntelligenceView() {
             <div className="space-y-6">
               <Card className="glass border-border/40">
                 <CardHeader>
-                  <CardTitle className="text-sm font-bold text-foreground">
-                    Intelligent Repository Locator
+                  <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Search className="h-4.5 w-4.5 text-primary" />
+                    Natural Language locator
                   </CardTitle>
                   <CardDescription className="text-muted-foreground text-xs leading-relaxed">
-                    Search files, routes, classes, or symbols using fuzzy name and path matching. Press{" "}
-                    <code className="bg-secondary/40 px-1 py-0.5 rounded text-primary font-bold">/</code> or{" "}
-                    <code className="bg-secondary/40 px-1 py-0.5 rounded text-primary font-bold">Ctrl+K</code> to focus.
+                    Search files, routes, classes, or components in the cache index. Press{" "}
+                    <code className="bg-secondary/40 px-1 py-0.5 rounded text-primary font-bold">/</code> to focus.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  {/* Big Search Bar */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -583,42 +603,41 @@ export function RepositoryIntelligenceView() {
                     className="flex gap-2"
                   >
                     <div className="relative flex-1">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
                       <input
                         ref={locatorInputRef}
                         type="text"
-                        placeholder="Where is authentication? Where is Graph Explorer?"
+                        placeholder="where is login / authentication / dashboard"
                         value={locatorQuery}
                         onChange={(e) => setLocatorQuery(e.target.value)}
-                        className="w-full bg-secondary/40 text-sm rounded-xl pl-10 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
+                        className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
                       />
                     </div>
-                    <Button type="submit" className="bg-primary hover:brightness-110 cursor-pointer">
+                    <Button type="submit" className="bg-primary hover:brightness-110 cursor-pointer font-bold px-6 py-3 rounded-xl">
                       Search
                     </Button>
                   </form>
 
-                  {/* Suggestion Quick Links */}
                   <div className="space-y-2">
                     <p className="text-[10px] text-muted-foreground/45 uppercase tracking-widest font-black">
                       Quick Suggestions
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {[
+                        "login",
                         "authentication",
-                        "GraphExplorer",
-                        "Dashboard",
-                        "analysis",
-                        "router",
-                        "api",
+                        "dashboard",
+                        "graph explorer",
+                        "parser",
+                        "theme provider",
                       ].map((s) => (
                         <button
                           key={s}
                           type="button"
                           onClick={() => handleSuggestionClick(s)}
-                          className="text-[10px] font-semibold bg-secondary/20 hover:bg-primary/10 border border-border/30 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer text-foreground/85 hover:text-primary"
+                          className="text-[10px] font-semibold bg-secondary/20 hover:bg-primary/10 border border-border/30 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer text-foreground/85 hover:text-primary font-mono"
                         >
-                          Where is {s}?
+                          where is {s}
                         </button>
                       ))}
                     </div>
@@ -626,47 +645,70 @@ export function RepositoryIntelligenceView() {
                 </CardContent>
               </Card>
 
-              {/* Locator Results Underneath */}
+              {/* Results Cards */}
               <div className="space-y-4">
+                {isFallbackResult && locatorResults.length > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded-xl text-xs font-mono">
+                    <HelpCircle className="h-4 w-4 shrink-0" />
+                    <span>No exact match found. Showing closest repository suggestions:</span>
+                  </div>
+                )}
+
                 {locatorResults.length > 0 ? (
                   <div className="grid gap-4 sm:grid-cols-2">
                     {locatorResults.map((node) => {
                       const degree = data?.graph.adjacency_map[node.id]?.length || 0;
+                      const typeColors = node.type === "Component"
+                        ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        : node.type === "Function"
+                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        : node.type === "Route"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        : "bg-sky-500/10 text-sky-400 border-sky-500/20";
+
                       return (
                         <motion.div
                           key={node.id}
                           initial={{ opacity: 0, scale: 0.98 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          className="p-4 rounded-xl border border-white/5 bg-white/[0.01] flex flex-col justify-between hover:border-primary/20 transition-all duration-300"
+                          className="p-5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] flex flex-col justify-between hover:border-primary/20 transition-all duration-300 relative overflow-hidden"
                         >
-                          <div>
-                            <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
                               <span className="text-sm font-semibold text-foreground truncate font-mono">
                                 {node.name}
                               </span>
-                              <Badge variant="outline" className="text-[9px] uppercase tracking-wider bg-white/[0.03] border border-white/5 text-muted-foreground px-2 py-0.5 rounded font-sans shrink-0">
+                              <Badge variant="outline" className={`text-[8px] font-semibold tracking-wide uppercase px-2 py-0.5 ${typeColors}`}>
                                 {node.type}
                               </Badge>
                             </div>
 
-                            <p className="text-[10px] font-mono text-muted-foreground/60 break-all mb-3.5">
+                            <p className="text-[10px] font-mono text-muted-foreground/60 break-all select-text bg-white/[0.02] p-2 rounded-lg border border-white/5">
                               {node.location}
                             </p>
 
-                            <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-mono">
-                              <span>Score: {node.importance_score?.toFixed(1) || "1.0"}</span>
-                              <span>Degree: {degree}</span>
+                            <p className="text-xs text-muted-foreground leading-relaxed font-sans">
+                              {getNodeDescription(node)}
+                            </p>
+
+                            <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-mono pt-1">
+                              <span className="flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3 text-primary" /> Importance: {node.importance_score?.toFixed(1) || "1.0"}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Network className="h-3 w-3 text-secondary" /> Relationships: {degree}
+                              </span>
                             </div>
                           </div>
 
-                          <div className="mt-4 pt-3.5 border-t border-white/5 flex items-center justify-end">
+                          <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-end">
                             <button
                               type="button"
                               onClick={() => handleOpenInGraph(node.id)}
                               className="text-xs text-primary hover:text-[#00FFC6] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               Open in Graph
-                              <ExternalLink className="h-3 w-3" />
+                              <ExternalLink className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </motion.div>
@@ -676,7 +718,7 @@ export function RepositoryIntelligenceView() {
                 ) : (
                   locatorQuery.trim() !== "" && (
                     <div className="text-center py-10 text-muted-foreground text-xs font-mono">
-                      No matching elements found. Try a different query.
+                      No results found. Try suggesting keywords like config or page.
                     </div>
                   )
                 )}
@@ -684,17 +726,17 @@ export function RepositoryIntelligenceView() {
             </div>
           )}
 
-          {/* TAB 2: Architecture */}
+          {/* TAB 2: Architecture Diagram */}
           {activeTab === "architecture" && (
             <div className="space-y-6">
               <Card className="glass border-border/40">
                 <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/5">
-                  <div>
+                  <div className="space-y-1">
                     <CardTitle className="text-sm font-bold text-foreground">
-                      Dynamic Architecture Diagram
+                      Repository Architecture Diagram
                     </CardTitle>
                     <CardDescription className="text-muted-foreground text-xs leading-relaxed">
-                      Generated dynamically from high-level backend services and frontend components relationships.
+                      System overview diagram excluding configuration assets and structural type boilerplate files.
                     </CardDescription>
                   </div>
 
@@ -707,7 +749,7 @@ export function RepositoryIntelligenceView() {
                       className="text-xs cursor-pointer border-white/10 hover:bg-white/5"
                     >
                       <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      {diagramCopied ? "Copied" : "Copy Source"}
+                      {diagramCopied ? "Copied" : "Copy Mermaid"}
                     </Button>
                     <Button
                       onClick={handleDownloadSvg}
@@ -749,11 +791,11 @@ export function RepositoryIntelligenceView() {
                       className={`relative flex items-center justify-center bg-secondary/15 rounded-xl border border-white/5 overflow-hidden transition-all duration-300 ${
                         isFullscreen
                           ? "fixed inset-4 z-50 bg-[#030712]/98 border-primary/30 p-8 shadow-2xl"
-                          : "h-[450px]"
+                          : "h-[480px]"
                       }`}
                     >
-                      {/* Zoom Controls */}
-                      <div className="absolute right-4 bottom-4 flex flex-col gap-1.5 z-10">
+                      {/* Zoom HUD */}
+                      <div className="absolute right-4 bottom-4 flex flex-col gap-1.5 z-10 select-none">
                         <button
                           type="button"
                           onClick={() => setZoomScale((prev) => Math.min(prev + 0.15, 2.5))}
@@ -790,7 +832,7 @@ export function RepositoryIntelligenceView() {
                       {!mermaidSvg ? (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          Compiling architecture layouts...
+                          Compiling architecture system flowchart...
                         </div>
                       ) : (
                         <div
@@ -806,32 +848,32 @@ export function RepositoryIntelligenceView() {
             </div>
           )}
 
-          {/* TAB 3: Dependencies */}
+          {/* TAB 3: Dependency Explorer */}
           {activeTab === "dependencies" && (
             <div className="space-y-6">
               <Card className="glass border-border/40">
                 <CardHeader>
                   <CardTitle className="text-sm font-bold text-foreground">
-                    Interactive Dependency Explorer
+                    Dependency System Explorer
                   </CardTitle>
                   <CardDescription className="text-muted-foreground text-xs leading-relaxed">
-                    Search and select a symbol or file node to map out its import and render dependencies recursively.
+                    Search and select a repository node to view its imports, calls, and incoming relationships.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Select Search Node */}
                   <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder="Type a component, file name, class..."
+                      placeholder="Type a component name, file path, route..."
                       value={depSearchQuery}
                       onChange={(e) => setDepSearchQuery(e.target.value)}
-                      className="w-full bg-secondary/40 text-sm rounded-xl pl-10 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
+                      className="w-full bg-secondary/40 text-sm rounded-xl pl-11 pr-4 py-3 border border-border/40 focus:outline-none focus:border-primary/50 text-foreground font-mono"
                     />
                   </div>
 
-                  {/* Autocomplete list */}
+                  {/* Autocomplete suggestions */}
                   {filteredNodesForDep.length > 0 && (
                     <div className="bg-secondary/80 border border-border/30 rounded-xl overflow-hidden divide-y divide-white/5 shadow-2xl">
                       {filteredNodesForDep.map((node) => (
@@ -843,7 +885,7 @@ export function RepositoryIntelligenceView() {
                             setDepSearchQuery("");
                             soundManager.playClick();
                           }}
-                          className="w-full text-left p-3 hover:bg-primary/5 transition-colors cursor-pointer flex items-center justify-between text-xs font-mono"
+                          className="w-full text-left p-3.5 hover:bg-primary/5 transition-colors cursor-pointer flex items-center justify-between text-xs font-mono"
                         >
                           <div className="min-w-0">
                             <p className="text-foreground font-semibold truncate">{node.name}</p>
@@ -857,14 +899,15 @@ export function RepositoryIntelligenceView() {
                     </div>
                   )}
 
-                  {/* Node Tree Render */}
-                  {selectedDepNode && (
-                    <div className="mt-8 border border-white/5 bg-white/[0.01] rounded-xl p-5 space-y-4">
-                      <div className="flex items-center justify-between gap-4 flex-wrap pb-3 border-b border-white/5">
+                  {/* Dependency Lists splitting */}
+                  {selectedDepNode ? (
+                    <div className="space-y-6 pt-4">
+                      {/* Active header info */}
+                      <div className="flex items-center justify-between gap-4 flex-wrap pb-3.5 border-b border-white/5">
                         <div className="flex items-center gap-2 font-mono">
-                          <span className="text-muted-foreground text-xs uppercase font-sans font-bold">Selected Element:</span>
-                          <span className="text-foreground font-semibold text-sm">{selectedDepNode.name}</span>
-                          <Badge variant="outline" className="text-[8px] uppercase shrink-0 font-sans">
+                          <span className="text-muted-foreground text-xs uppercase font-sans font-bold">Selected Node:</span>
+                          <span className="text-foreground font-bold text-sm">{selectedDepNode.name}</span>
+                          <Badge variant="outline" className="text-[8px] uppercase font-sans">
                             {selectedDepNode.type}
                           </Badge>
                         </div>
@@ -874,14 +917,87 @@ export function RepositoryIntelligenceView() {
                           className="text-xs text-primary hover:text-[#00FFC6] font-bold flex items-center gap-1 cursor-pointer"
                         >
                           Open in Graph
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3.5 w-3.5" />
                         </button>
                       </div>
 
-                      {/* Collapsible tree root */}
-                      <div className="py-2 overflow-x-auto">
-                        <DependencyTreeBranch nodeId={selectedDepNode.id} depth={0} />
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {/* Section 1: Depends On (Outgoing) */}
+                        <Card className="bg-white/[0.01] border-white/5">
+                          <CardHeader className="py-3.5 px-4 border-b border-white/5 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                              Depends On ({dependsOnList.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 space-y-3">
+                            {dependsOnList.length > 0 ? (
+                              dependsOnList.map((dep) => (
+                                <div
+                                  key={dep.edge.id}
+                                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all font-mono"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-foreground truncate">{dep.node.name}</p>
+                                    <p className="text-[9px] text-muted-foreground/60 truncate">{dep.node.location}</p>
+                                    <p className="text-[9px] text-primary italic uppercase mt-1">Relation: {dep.edge.relation.toLowerCase()}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenInGraph(dep.node.id)}
+                                    className="text-[9px] text-muted-foreground hover:text-primary transition-colors cursor-pointer shrink-0"
+                                  >
+                                    Open
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-center py-6 text-xs text-muted-foreground font-mono">
+                                No outgoing dependencies detected.
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Section 2: Used By (Incoming) */}
+                        <Card className="bg-white/[0.01] border-white/5">
+                          <CardHeader className="py-3.5 px-4 border-b border-white/5 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                              Used By ({usedByList.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 space-y-3">
+                            {usedByList.length > 0 ? (
+                              usedByList.map((dep) => (
+                                <div
+                                  key={dep.edge.id}
+                                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-white/5 bg-secondary/15 hover:border-primary/20 transition-all font-mono"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-foreground truncate">{dep.node.name}</p>
+                                    <p className="text-[9px] text-muted-foreground/60 truncate">{dep.node.location}</p>
+                                    <p className="text-[9px] text-[#00FFC6] italic uppercase mt-1">Relation: {dep.edge.relation.toLowerCase()}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenInGraph(dep.node.id)}
+                                    className="text-[9px] text-muted-foreground hover:text-[#00FFC6] transition-colors cursor-pointer shrink-0"
+                                  >
+                                    Open
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-center py-6 text-xs text-muted-foreground font-mono">
+                                No incoming callers or importers found.
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-muted-foreground text-xs font-mono">
+                      Type and select a node above to inspect its dependencies.
                     </div>
                   )}
                 </CardContent>
