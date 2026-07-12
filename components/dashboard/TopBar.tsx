@@ -2,7 +2,6 @@
 
 import {
   Menu,
-  Search,
   ExternalLink,
   Star,
   ChevronDown,
@@ -73,30 +72,13 @@ export function TopBar({ onMobileMenuToggle }: TopBarProps) {
       </div>
 
       <div className="flex-1" />
-
-      {/* Search */}
-      <div className="hidden items-center gap-2 rounded-lg border border-border/40 bg-secondary/50 px-3 py-1.5 sm:flex">
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search repository…"
-          className="w-32 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none lg:w-48"
-          aria-label="Search repository"
-        />
-        <kbd className="hidden rounded border border-border/60 bg-background/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground lg:inline-block">
-          ⌘K
-        </kbd>
-      </div>
-
-
-
-      {/* User avatar placeholder */}
-      <div
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary"
-        aria-label="User avatar"
-        role="img"
-      >
-        KS
+      
+      {/* AI Ready Indicator Badge */}
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/25 select-none tracking-wider">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#00FFC6] animate-pulse" />
+          AI READY
+        </span>
       </div>
     </header>
   );

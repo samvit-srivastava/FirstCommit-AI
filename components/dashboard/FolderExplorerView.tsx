@@ -7,23 +7,39 @@ import {
   FolderOpen, 
   ChevronRight, 
   ChevronDown, 
-  FolderTree, 
   Info, 
   HelpCircle,
   Layout,
   Server,
   Hammer,
   FileText,
-  CheckSquare,
   Image,
-  FileCode
+  FileCode,
+  Terminal
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAnalysisData } from "@/hooks/use-analysis-data";
+import { useAnalysis } from "@/lib/AnalysisContext";
 import type { FolderItem } from "@/types";
 import { soundManager } from "@/lib/sounds";
+
+interface RichFolderItem {
+  name: string;
+  path: string;
+  explanation: string;
+  category?: string;
+  contains?: string[];
+  importance?: string;
+  confidence?: number;
+  source?: string;
+  provider?: string | null;
+  model?: string | null;
+  files_count?: number;
+  size_bytes?: number;
+  children?: RichFolderItem[];
+}
 
 // Helper to simulate mock file counts for aesthetics
 const MOCK_FILE_COUNTS: Record<string, { files: number; size: string; flow: string[] }> = {
@@ -35,6 +51,34 @@ const MOCK_FILE_COUNTS: Record<string, { files: number; size: string; flow: stri
   test: { files: 256, size: "16.1 MB", flow: ["Unit tests runner", "Playwright workspace", "E2E testing cases"] },
 };
 
+const IMPORTANCE_COLOR: Record<string, string> = {
+  High: "text-red-400 border-red-400/20 bg-red-400/10",
+  Medium: "text-amber-400 border-amber-400/20 bg-amber-400/10",
+  Low: "text-sky-400 border-sky-400/20 bg-sky-400/10",
+};
+
+const CATEGORY_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+  Frontend: { label: "Frontend UI", icon: Layout, color: "text-blue-400 border-blue-400/20 bg-blue-400/10" },
+  Backend: { label: "Backend API", icon: Server, color: "text-emerald-400 border-emerald-400/20 bg-emerald-400/10" },
+  Test: { label: "Test Suite", icon: Hammer, color: "text-purple-400 border-purple-400/20 bg-purple-400/10" },
+  Docs: { label: "Documentation", icon: FileText, color: "text-orange-400 border-orange-400/20 bg-orange-400/10" },
+  Assets: { label: "Static Assets", icon: Image, color: "text-rose-400 border-rose-400/20 bg-rose-400/10" },
+  Unknown: { label: "Directory", icon: Folder, color: "text-muted-foreground border-white/5 bg-white/[0.02]" },
+};
+
+const SOURCE_META: Record<string, { label: string; color: string }> = {
+  llm: { label: "AI Indexed", color: "text-primary border-primary/20 bg-primary/10" },
+  template: { label: "Static Parser", color: "text-muted-foreground border-white/5 bg-white/[0.02]" },
+};
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes === 0) return "—";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
 function TypingText({ text }: { text: string }) {
   const [displayedText, setDisplayedText] = useState("");
   const [lastText, setLastText] = useState(text);
@@ -44,37 +88,15 @@ function TypingText({ text }: { text: string }) {
     setDisplayedText("");
   }
 
-  // Fallback to legacy format if folders array is empty but folder_explanation exists
-  if (folders.length === 0 && analysisResult?.folder_explanation) {
-    analysisResult.folder_explanation.forEach((item) => {
-      const cleanName = item.path.replace(/\/$/, "");
-      folders.push({
-        name: cleanName,
-        path: item.path,
-        category: "Unknown",
-        description: item.purpose,
-        contains: [],
-        importance: "Medium",
-        confidence: 100,
-        source: "template",
-        provider: null,
-        model: null,
-        files_count: 0,
-        size_bytes: 0,
-        children: []
-      });
-    });
-  }
-
   useEffect(() => {
     let idx = 0;
     const interval = setInterval(() => {
-      setDisplayedText((prev) => prev + text.charAt(idx));
+      setDisplayedText((prev) => prev + text.slice(0, idx + 1));
       idx++;
       if (idx >= text.length) {
         clearInterval(interval);
       }
-    }, 10); // Speed up typing
+    }, 6);
     return () => clearInterval(interval);
   }, [text]);
 
@@ -84,8 +106,49 @@ function TypingText({ text }: { text: string }) {
 export function FolderExplorerView() {
   const { data } = useAnalysisData();
   const { folders } = data;
-  const [selectedFolder, setSelectedFolder] = useState<FolderItem | null>(() => {
-    return folders.length > 0 ? folders[0] : null;
+  const { analysisResult } = useAnalysis();
+
+  const getStats = (path: string) => {
+    const key = path.endsWith("/") ? path.slice(0, -1) : path;
+    const name = key.split("/").pop() ?? "";
+
+    return (
+      MOCK_FILE_COUNTS[name] ?? {
+        files: 8,
+        size: "128 KB",
+        flow: [
+          "Local Directory File",
+          "Code configuration logic",
+          "Diagnostic indexes",
+        ],
+      }
+    );
+  };
+
+  // Map FolderItem list to RichFolderItem objects recursively
+  const mapToRichFolder = (item: FolderItem): RichFolderItem => {
+    const detailed = (analysisResult?.folders || []).find(
+      (df) => df.name === item.name || df.name === item.path
+    );
+    return {
+      ...item,
+      category: detailed?.category || "Unknown",
+      contains: detailed?.contains || [],
+      importance: detailed?.importance || "Medium",
+      confidence: detailed?.confidence || 100,
+      source: detailed?.source || "template",
+      provider: detailed?.provider || null,
+      model: detailed?.model || null,
+      files_count: detailed?.files_count || 0,
+      size_bytes: detailed?.size_bytes || 0,
+      children: item.children ? item.children.map(mapToRichFolder) : undefined,
+    };
+  };
+
+  const richFolders = folders.map(mapToRichFolder);
+
+  const [selectedFolder, setSelectedFolder] = useState<RichFolderItem | null>(() => {
+    return richFolders.length > 0 ? richFolders[0] : null;
   });
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
     "packages/": true,
@@ -93,17 +156,17 @@ export function FolderExplorerView() {
   });
 
   // Keep selected folder in sync if the folders array changes
-  const currentFoldersPathStr = folders.map((f) => f.path).join(",");
+  const currentFoldersPathStr = richFolders.map((f) => f.path).join(",");
   const [lastFoldersPathStr, setLastFoldersPathStr] = useState(currentFoldersPathStr);
 
   if (currentFoldersPathStr !== lastFoldersPathStr) {
     setLastFoldersPathStr(currentFoldersPathStr);
-    if (!selectedFolder || !folders.some((f) => f.path === selectedFolder.path)) {
-      setSelectedFolder(folders.length > 0 ? folders[0] : null);
+    if (!selectedFolder || !richFolders.some((f) => f.path === selectedFolder.path)) {
+      setSelectedFolder(richFolders.length > 0 ? richFolders[0] : null);
     }
   }
 
-  if (folders.length === 0 || !selectedFolder) {
+  if (richFolders.length === 0 || !selectedFolder) {
     return (
       <div className="text-center py-12 text-muted-foreground text-sm">
         No folders detected. Please verify repository contents.
@@ -115,27 +178,14 @@ export function FolderExplorerView() {
     setExpandedFolders((prev) => ({ ...prev, [path]: !prev[path] }));
   };
 
-  const getStats = (path: string) => {
-    const key = path.endsWith("/") ? path.slice(0, -1) : path;
-    const name = key.split("/").pop() ?? "";
-    return MOCK_FILE_COUNTS[name] ?? { 
-      files: 8, 
-      size: "128 KB",
-      flow: ["Local Directory File", "Code configuration logic", "Diagnostic indexes"]
-    };
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k)) ? Math.floor(Math.log(bytes) / Math.log(k)) : 0;
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  };
+  const selectedStats = getStats(selectedFolder.path);
 
   // Recursive Tree Node renderer
   const renderTree = (item: RichFolderItem, depth = 0) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = !!expandedFolders[item.path];
     const isSelected = selectedFolder.path === item.path;
+    const stats = getStats(item.path);
 
     return (
       <div key={item.path} className="select-none font-mono">
@@ -234,7 +284,7 @@ export function FolderExplorerView() {
           <CardContent className="p-2 flex-1 overflow-hidden">
             <ScrollArea className="h-full pr-2">
               <div className="space-y-1 py-1">
-                {folders.map((folder) => renderTree(folder))}
+                {richFolders.map((folder) => renderTree(folder))}
               </div>
             </ScrollArea>
           </CardContent>
@@ -244,7 +294,7 @@ export function FolderExplorerView() {
         <Card className="glass border-border/40 md:col-span-3 h-[480px] flex flex-col justify-between overflow-hidden relative">
           <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
           
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col overflow-hidden">
             <CardHeader className="p-5 pb-3 border-b border-border/20">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-mono text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 truncate max-w-[70%]">
@@ -252,16 +302,6 @@ export function FolderExplorerView() {
                 </span>
                 <span className="text-[9px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded shrink-0">
                   {selectedStats.size}
-                </span>
-              </div>
-              <CardTitle className="text-lg font-heading font-black text-foreground mt-3 flex items-center gap-2">
-                <FolderOpen className="h-5 w-5 text-[#00FFC6]" />
-                {selectedFolder.name}
-              </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                Contains {selectedStats.files} source files and configurations.
-                <span className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded shrink-0">
-                  {formatBytes(selectedFolder.size_bytes)}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
@@ -290,7 +330,7 @@ export function FolderExplorerView() {
                 </div>
               </div>
               <CardDescription className="text-xs text-muted-foreground mt-1">
-                Contains {selectedFolder.files_count} files in total.
+                Contains {selectedFolder.files_count || selectedStats.files} files in total ({selectedFolder.size_bytes ? formatBytes(selectedFolder.size_bytes) : selectedStats.size}).
               </CardDescription>
             </CardHeader>
 
@@ -326,9 +366,9 @@ export function FolderExplorerView() {
                       );
                     })()}
                   </div>
-                  <p className="text-sm leading-relaxed text-foreground/90 bg-secondary/20 p-4 rounded-xl border border-border/20">
-                    {selectedFolder.description || "No description provided for this folder."}
-                  </p>
+                  <div className="text-sm leading-relaxed text-foreground/90 bg-secondary/20 p-4 rounded-xl border border-border/20">
+                    <TypingText text={selectedFolder.explanation || "No description provided for this folder."} />
+                  </div>
                 </div>
 
                 {/* Real Repository Contents (Files) */}
@@ -349,14 +389,14 @@ export function FolderExplorerView() {
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
 
               </div>
             </ScrollArea>
           </div>
 
           {/* Footer prompt */}
-          <div className="p-4 border-t border-border/20 bg-secondary/15 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="p-4 border-t border-border/20 bg-secondary/15 flex items-center gap-2 text-xs text-muted-foreground mt-auto">
             <HelpCircle className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>Select folders in the tree on the left to learn about their structure and size metrics.</span>
           </div>

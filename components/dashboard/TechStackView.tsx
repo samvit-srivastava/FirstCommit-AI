@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code2, Layout, Server, Database, Hammer, Info, HelpCircle, Globe, Cloud } from "lucide-react";
+import { Code2, Layout, Server, Database, Hammer, Info, HelpCircle, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAnalysis } from "@/lib/AnalysisContext";
@@ -37,158 +37,83 @@ const CATEGORY_MAP = {
   other: { label: "Other", icon: HelpCircle, color: "text-slate-500 bg-slate-500/10 border-slate-500/20" },
 } as const;
 
-// Add mock usage weights/percentages for tech stack visualization
-const TECH_DETAILS: Record<string, { usage: number; description: string }> = {
-  React: { usage: 94, description: "Core UI component library driving the page views and rendering engine." },
-  TypeScript: { usage: 88, description: "Primary development language ensuring type safety across client and server." },
-  JavaScript: { usage: 45, description: "Used in legacy script components and package setup files." },
-  Webpack: { usage: 60, description: "Legacy bundler support for older packages and pages rendering router." },
-  Turbopack: { usage: 78, description: "Incremental Rust-based compiler engine for instant hot reloads." },
-  SWC: { usage: 82, description: "Rust-based platform for fast compilation, transpilation, and minification." },
-  Jest: { usage: 70, description: "Unit test coverage framework verifying package hooks and router functions." },
-  Playwright: { usage: 65, description: "End-to-end browser environment tests validating app page flows." },
-  Rust: { usage: 35, description: "Powers compile-time binaries and optimization modules in Turbopack/SWC." },
-  "CSS Modules": { usage: 80, description: "Component-scoped styles for local, isolated presentation properties." },
-  PostCSS: { usage: 75, description: "Automated CSS processing compiling tailwind directives and style variables." },
-  "Node.js": { usage: 85, description: "Execution environment for local dev servers and server-side request pipelines." },
-};
+type CategoryKey = keyof typeof CATEGORY_MAP;
 
-// Preset documentation URL mappings and details for technologies
-const TECH_PORTAL: Record<
-  string,
-  { usage: number; files: number; docsUrl: string; tips: string }
-> = {
-  React: {
-    usage: 95,
-    files: 48,
-    docsUrl: "https://react.dev",
-    tips: "Utilize hooks carefully; avoid triggering unnecessary re-renders in deep trees.",
-  },
-  Next: {
-    usage: 92,
-    files: 32,
-    docsUrl: "https://nextjs.org",
-    tips: "Ensure components are Client Components (use client) only when relying on state/hooks.",
-  },
-  Tailwind: {
-    usage: 88,
-    files: 54,
-    docsUrl: "https://tailwindcss.com",
-    tips: "Abstract complex styling classes using custom layers or theme tokens in globals.css.",
-  },
-  TypeScript: {
-    usage: 90,
-    files: 110,
-    docsUrl: "https://typescriptlang.org",
-    tips: "Keep compiler configurations strict and avoid using explicit 'any' types.",
-  },
-  "Node.js": {
-    usage: 82,
-    files: 15,
-    docsUrl: "https://nodejs.org",
-    tips: "Leverage native async/await patterns for clean non-blocking network streams.",
-  },
-  FastAPI: {
-    usage: 75,
-    files: 12,
-    docsUrl: "https://fastapi.tiangolo.com",
-    tips: "Write typed Pydantic models to guarantee request-response schema stability.",
-  },
-  Uvicorn: {
-    usage: 70,
-    files: 4,
-    docsUrl: "https://uvicorn.org",
-    tips: "Run dev servers reload profile only inside local staging test profiles.",
+function getCatConfig(category: string) {
+  const key = category.toLowerCase() as CategoryKey;
+  return CATEGORY_MAP[key] ?? CATEGORY_MAP.other;
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15, scale: 0.985 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1, 
+    transition: { type: "spring" as const, stiffness: 120, damping: 14 } 
   },
 };
 
 export function TechStackView() {
-  const { data } = useAnalysisData();
-  const { techStack } = data;
-  const [selectedTech, setSelectedTech] = useState<string>(() => {
-    return techStack && techStack.length > 0 ? techStack[0].name : "";
-  });
+  const { analysisResult } = useAnalysis();
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
-  const currentTechStackStr = techStack.map((t) => t.name).join(",");
-  const [lastTechStackStr, setLastTechStackStr] = useState(currentTechStackStr);
-  if (currentTechStackStr !== lastTechStackStr) {
-    setLastTechStackStr(currentTechStackStr);
-    setSelectedTech(techStack.length > 0 ? techStack[0].name : "");
-  }
-
-  const techStack = (analysisResult.technologies || []).map((item) => ({
+  const technologies = (analysisResult?.technologies || []).map((item) => ({
     name: item.display_name,
-    category: (item.category.toLowerCase() as any) || "other",
+    category: (item.category?.toLowerCase() || "other"),
     version: item.version,
     evidence: item.evidence,
-    coverage: item.coverage,
+    coverage: item.coverage || 40,
   }));
 
-  const getTechDetails = (name: string) => {
-    return TECH_PORTAL[name] ?? {
-      usage: 55,
-      files: 8,
-      docsUrl: `https://github.com/search?q=${name}`,
-      tips: `Integrated dependency parsed in codebase config. Consult the project README for setup details.`,
-    };
-  };
+  const filteredTech = activeCategory === "all"
+    ? technologies
+    : technologies.filter((t) => t.category === activeCategory);
 
-  const selectedDetails = getTechDetails(selectedTech);
+  const categories = ["all", ...Array.from(new Set(technologies.map((t) => t.category)))];
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto select-none">
-      
       {/* Title section */}
       <div>
         <h1 className="text-2xl font-heading font-black tracking-tight text-foreground sm:text-3xl">
           Technology Analysis
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Orbital system mapping libraries, languages, and bundler utilities indexed in this workspace.
+          Libraries, languages, and bundler utilities indexed in this workspace.
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-5 items-start">
-        {/* Left Side: 3D-like Orbital Map */}
-        <Card className="glass border-border/40 md:col-span-2 h-[480px] flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="absolute top-4 left-4 font-mono text-[9px] text-[#00FFC6]/60">
-            ORBIT_ENGINE: ROTATING
-          </div>
-
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,92,255,0.03)_0%,transparent_60%)]" />
-
-          {/* Central AI Core Orb */}
-          <div className="relative h-72 w-72 flex items-center justify-center">
-            
-            {/* Concentric orbital rings */}
-            <div className="absolute h-64 w-64 rounded-full border border-border/40 border-dashed animate-[spin_40s_linear_infinite]" />
-            <div className="absolute h-40 w-40 rounded-full border border-border/20 border-dotted" />
-
-            {/* Orbit wrapper rotating */}
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 flex items-center justify-center"
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {categories.map((cat) => {
+          const isActive = activeCategory === cat;
+          const config = cat !== "all" ? getCatConfig(cat) : null;
+          return (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                isActive
+                  ? "bg-primary/15 border-primary/40 text-primary"
+                  : "border-white/5 bg-white/[0.01] text-muted-foreground/60 hover:border-white/10 hover:text-foreground"
+              }`}
             >
-              {techStack.map((tech, idx) => {
-                const angle = (idx * (2 * Math.PI)) / techStack.length;
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-                const isSelected = selectedTech === tech.name;
+              {config && <config.icon className="h-3.5 w-3.5" />}
+              {cat}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Grid listing */}
+      {/* Tech Cards Grid */}
       <motion.div
         layout
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         <AnimatePresence mode="popLayout">
           {filteredTech.map((item) => {
-            const catConfig = CATEGORY_MAP[item.category as keyof typeof CATEGORY_MAP] || CATEGORY_MAP.other;
-            const details = TECH_DETAILS[item.name] ?? {
-              usage: 40,
-              description: "Detected package dependency active in codebase.",
-            };
-
+            const catConfig = getCatConfig(item.category);
             return (
               <motion.div
                 key={item.name}
@@ -199,7 +124,7 @@ export function TechStackView() {
                 exit="hidden"
                 className="h-full"
               >
-                <Card className="glass border-border/40 h-full flex flex-col justify-between transition-all duration-200 hover:glow-sm">
+                <Card className="glass border-white/10 h-full flex flex-col justify-between transition-all duration-200 hover:glow-sm relative bg-white/[0.01] hover:bg-white/[0.03]">
                   <div>
                     <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
                       <div className="flex items-center gap-2.5">
@@ -225,7 +150,6 @@ export function TechStackView() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-4 pt-2 text-xs leading-relaxed text-muted-foreground space-y-2">
-                      <p>{details.description}</p>
                       {item.evidence && (
                         <p className="text-[9px] text-muted-foreground/50 font-mono select-all truncate" title={item.evidence}>
                           Evidence: {item.evidence}
@@ -233,7 +157,6 @@ export function TechStackView() {
                       )}
                     </CardContent>
                   </div>
-                </div>
 
                   {/* Skill level / Codebase coverage progress indicator */}
                   <div className="p-4 pt-0 space-y-1">
@@ -250,34 +173,19 @@ export function TechStackView() {
                       />
                     </div>
                   </div>
-                  <div className="flex items-baseline gap-1.5 font-mono">
-                    <span className="text-2xl font-black">{selectedDetails.files}</span>
-                    <span className="text-xs text-muted-foreground">source objects</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-2 font-mono">CODEBASE_DENSITY: HIGH</p>
-                </div>
-              </div>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </motion.div>
 
-              {/* Onboarding recommendation tip */}
-              <div className="space-y-2.5">
-                <h4 className="text-xs font-heading font-bold uppercase tracking-wider text-[#00FFC6] flex items-center gap-1.5">
-                  <Info className="h-4 w-4" />
-                  AI Onboarding Guidance
-                </h4>
-                <div className="p-4 bg-primary/5 rounded-xl border border-primary/20 text-sm leading-relaxed text-foreground/90 font-sans">
-                  {selectedDetails.tips}
-                </div>
-              </div>
-            </CardContent>
-          </div>
-
-          <div className="p-4 border-t border-border/20 bg-secondary/15 flex items-center gap-2 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
-            <span>Hover and click satellite nodes on the orbital layout to fetch detailed diagnostics logs.</span>
-          </div>
-        </Card>
-      </div>
-
+      {filteredTech.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Info className="h-8 w-8 text-muted-foreground/30" />
+          <p className="text-sm">No technologies found in this category.</p>
+        </div>
+      )}
     </div>
   );
 }

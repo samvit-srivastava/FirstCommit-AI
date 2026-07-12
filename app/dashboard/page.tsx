@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, Cpu, Award, Zap } from "lucide-react";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
@@ -74,154 +73,56 @@ export default function DashboardPage() {
       ]
     : mockRecentActivity;
 
-
-
   return (
     <div className="mx-auto max-w-7xl space-y-8 select-none">
       
-      {/* 1. Tactical Welcome Header HUD */}
+      {/* 1. Cinematic Staggered Compact Hero Panel */}
       <motion.div 
         initial={{ opacity: 0, y: -15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="glass border-primary/20 p-6 rounded-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+        className="border border-white/10 bg-white/[0.02] backdrop-blur-md shadow-2xl p-6 rounded-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6"
       >
-        <div className="absolute top-0 left-0 h-[2px] w-full bg-[linear-gradient(90deg,transparent,#7C5CFF,#00D4FF,transparent)]" />
+        <div className="absolute top-0 left-0 h-[1px] w-full bg-[linear-gradient(90deg,transparent,#7C5CFF,#00D4FF,transparent)] opacity-40" />
         
-        {/* User profile telemetry */}
-        <div className="flex items-center gap-4">
-          <div className="relative h-14 w-14 shrink-0 rounded-xl border border-[#00FFC6]/40 bg-card/60 flex items-center justify-center overflow-hidden glow-sm group-hover:glow">
-            <Cpu className="h-8 w-8 text-[#00FFC6] animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-xl font-heading font-black tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
-              Welcome back, Commander
-              <span className="text-primary font-bold">Krishna Singh</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Active indexing: <span className="text-[#00D4FF] font-mono">{data.summary.name}</span>
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl font-heading font-black tracking-tight text-foreground sm:text-2xl">
+            Repository Intelligence
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground/70 mt-1 leading-relaxed font-medium">
+            Analyze, understand and navigate your codebase with AI.
+          </p>
         </div>
 
-        {/* XP level & badges */}
-        <div className="flex flex-col w-full md:w-64 gap-2 font-mono text-xs border-t border-border/40 md:border-t-0 pt-4 md:pt-0">
-          <div className="flex justify-between items-center text-[10px]">
-            <span className="text-muted-foreground flex items-center gap-1"><Award className="h-3.5 w-3.5 text-primary" /> LEVEL 4 ONBOARDER</span>
-            <span className="text-primary font-bold">2560 / 3000 XP</span>
+        {/* Telemetry Capsule bar */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] text-muted-foreground/40 font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">REPOSITORY:</span>
+            <span className="text-foreground font-bold">{data.summary.name}</span>
           </div>
-          <div className="h-2 w-full bg-secondary/15 rounded-full overflow-hidden border border-border/20">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: "85%" }}
-              transition={{ duration: 1.2, ease: "easeOut" }}
-              className="h-full bg-[linear-gradient(90deg,#7C5CFF,#00D4FF)]"
-            />
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground/30 font-sans font-bold text-[9px]">LANGUAGE:</span>
+            <div className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-mono font-bold bg-white/[0.04] border border-white/10 backdrop-blur-sm shadow-sm select-none">
+              <span className="bg-gradient-to-r from-[#8B5CF6] to-[#00D4FF] bg-clip-text text-transparent font-black">
+                {data.summary.language || "TypeScript"}
+              </span>
+            </div>
+          </div>
+          <div className="h-3.5 w-[1px] bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[8px] font-mono font-bold bg-[#00FFC6]/10 text-[#00FFC6] border border-[#00FFC6]/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#00FFC6] animate-pulse" />
+              AI COMPLETE
+            </span>
           </div>
         </div>
       </motion.div>
 
-      {/* 2. Tactical Circular HUD Gauges */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Gauge 1: Security Risk */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="glass border-border/40 p-5 rounded-2xl relative overflow-hidden flex items-center gap-5 group"
-        >
-          {/* Circular progress SVG */}
-          <div className="relative h-20 w-20 shrink-0">
-            <svg className="w-full h-full transform -rotate-95" viewBox="0 0 36 36">
-              <path className="text-secondary/10" strokeWidth="2.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <motion.path 
-                initial={{ strokeDasharray: "0, 100" }}
-                animate={{ strokeDasharray: "98, 100" }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className="text-[#00FFC6]" 
-                strokeDasharray="98, 100" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-                stroke="currentColor" 
-                fill="none" 
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-[#00FFC6]">98%</div>
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#00FFC6]" /> Security Score</h3>
-            <p className="text-xs text-muted-foreground mt-1">Outstanding posture. No critical exposure vectors found.</p>
-          </div>
-        </motion.div>
-
-        {/* Gauge 2: Codebase Health */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.15 }}
-          className="glass border-border/40 p-5 rounded-2xl relative overflow-hidden flex items-center gap-5 group"
-        >
-          <div className="relative h-20 w-20 shrink-0">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-              <path className="text-secondary/10" strokeWidth="2.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <motion.path 
-                initial={{ strokeDasharray: "0, 100" }}
-                animate={{ strokeDasharray: "96, 100" }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className="text-[#00D4FF]" 
-                strokeDasharray="96, 100" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-                stroke="currentColor" 
-                fill="none" 
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-[#00D4FF]">96%</div>
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5"><Zap className="h-4 w-4 text-[#00D4FF]" /> Codebase Health</h3>
-            <p className="text-xs text-muted-foreground mt-1">Excellent index rating. Code duplication & complexity is low.</p>
-          </div>
-        </motion.div>
-
-        {/* Gauge 3: AI Confidence */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="glass border-border/40 p-5 rounded-2xl relative overflow-hidden flex items-center gap-5 group"
-        >
-          <div className="relative h-20 w-20 shrink-0">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-              <path className="text-secondary/10" strokeWidth="2.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <motion.path 
-                initial={{ strokeDasharray: "0, 100" }}
-                animate={{ strokeDasharray: "94, 100" }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className="text-primary" 
-                strokeDasharray="94, 100" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-                stroke="currentColor" 
-                fill="none" 
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-primary">94%</div>
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5"><Cpu className="h-4 w-4 text-primary" /> AI indexing level</h3>
-            <p className="text-xs text-muted-foreground mt-1">Precise dependency context mapped. Ready for diagnostic chat.</p>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* 3. Core Stats */}
+      {/* 2. Core Stats */}
       <OverviewCards stats={overviewStats} />
 
-      {/* 4. Details Split layout */}
+      {/* 3. Details Split layout */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <RecentActivity activities={recentActivity} />
