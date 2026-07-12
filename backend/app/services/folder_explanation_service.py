@@ -454,7 +454,15 @@ IGNORE_FOLDERS = {
 class FolderExplanationService:
     def __init__(self):
         # Cache file located in the scratch directory
-        self.cache_dir = Path("C:/Users/lenovo/.gemini/antigravity/brain/54442039-6681-46f8-aef3-919486f33e98")
+        from pathlib import Path
+
+        self.cache_dir = (
+            Path.home()
+            / ".gemini"
+            / "antigravity"
+            / "brain"
+            / "54442039-6681-46f8-aef3-919486f33e98"
+        )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_path = self.cache_dir / "folder_explanations_cache.json"
         self.cache = self._load_cache()
