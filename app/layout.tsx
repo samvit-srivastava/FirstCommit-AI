@@ -23,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "FirstCommit AI — Understand Any Repository in Minutes",
   description:
-    "AI Developer Onboarding Assistant. Paste a GitHub URL and get an instant project summary, tech stack breakdown, folder explanations, personalized roadmap, and repository-aware chat.",
+    "AI Developer Onboarding Assistant. Paste a GitHub URL and get an instant project summary, tech stack breakdown, folder explanations, personalized roadmap, and interactive relationships graph.",
   keywords: [
     "developer onboarding",
     "GitHub",

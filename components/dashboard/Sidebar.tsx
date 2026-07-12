@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   BookOpen,
   Map,
-  MessageSquare,
   ChevronsLeft,
   ChevronsRight,
   GitBranch,
@@ -24,7 +23,6 @@ const NAV_ITEMS = [
   { id: "roadmap", label: "Roadmap", icon: Map },
   { id: "graph", label: "Graph Explorer", icon: Network },
   { id: "intelligence", label: "Repository Intelligence", icon: Cpu },
-  { id: "chat", label: "Ask Repo", icon: MessageSquare },
 ] as const;
 
 interface SidebarProps {

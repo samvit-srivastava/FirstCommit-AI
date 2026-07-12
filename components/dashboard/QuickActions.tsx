@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Plus, Map, MessageSquare, FolderTree, ArrowRight, Terminal } from "lucide-react";
+import { Plus, Map, Network, Cpu, ArrowRight, Terminal } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { soundManager } from "@/lib/sounds";
 
@@ -22,16 +22,16 @@ const SECONDARY_ACTIONS = [
     href: "/dashboard/roadmap",
   },
   {
-    label: "Ask AI",
-    description: "Chat with the repository AI",
-    icon: MessageSquare,
-    href: "/dashboard/chat",
+    label: "Graph Explorer",
+    description: "Interactive visual relationships",
+    icon: Network,
+    href: "/dashboard/graph",
   },
   {
-    label: "Explore Folders",
-    description: "Browse the project structure",
-    icon: FolderTree,
-    href: "/dashboard/folders",
+    label: "Intelligence Center",
+    description: "Fuzzy search and dependencies",
+    icon: Cpu,
+    href: "/dashboard/intelligence",
   },
 ] as const;
 

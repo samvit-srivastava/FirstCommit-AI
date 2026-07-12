@@ -73,14 +73,6 @@ class AnalyzeResponse(BaseModel):
     watchers: Optional[int] = 0
     updated_at: Optional[str] = ""
 
-class ChatRequest(BaseModel):
-    repo_id: str
-    question: str
-
-class ChatResponse(BaseModel):
-    answer: str
-    referenced_files: List[str]
-
 class GraphNode(BaseModel):
     id: str
     name: str

@@ -4,7 +4,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 export const metadata: Metadata = {
   title: "Dashboard — FirstCommit AI",
   description:
-    "Repository analysis dashboard with project summary, tech stack, folder explorer, onboarding roadmap, and AI chat.",
+    "Repository analysis dashboard featuring project overview, summary details, onboarding roadmap, relationships graph, and architectural intelligence.",
 };
 
 export default function DashboardLayout({

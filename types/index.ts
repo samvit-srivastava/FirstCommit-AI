@@ -37,13 +37,6 @@ export type DeveloperRole =
   | "fullstack"
   | "opensource";
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  referencedFiles?: string[];
-}
-
 export interface AnalysisResult {
   summary: ProjectSummary;
   techStack: TechItem[];
