@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Map, FileCode, Check, AlertCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import { FileCode, Check, Lock, PlayCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { DEVELOPER_ROLES } from "@/lib/constants";
-import { useAnalysis } from "@/lib/AnalysisContext";
+import { useAnalysisData } from "@/hooks/use-analysis-data";
 import type { DeveloperRole } from "@/types";
+import { soundManager } from "@/lib/sounds";
 
 const itemVariants = {
   hidden: { opacity: 0, x: -20 },
@@ -25,8 +25,10 @@ const containerVariants = {
   },
 };
 
+const GAME_TIERS = ["Foundation", "Core", "Intermediate", "Advanced", "Expert"];
+
 export function OnboardingRoadmapView() {
-  const { analysisResult } = useAnalysis();
+  const { data } = useAnalysisData();
   const [activeRole, setActiveRole] = useState<DeveloperRole>("frontend");
   const [completedSteps, setCompletedSteps] = useState<Record<DeveloperRole, Record<number, boolean>>>({
     frontend: { 1: true },
@@ -35,23 +37,11 @@ export function OnboardingRoadmapView() {
     opensource: {},
   });
 
-  if (!analysisResult) {
-    return (
-      <div className="text-center py-12 text-muted-foreground text-sm">
-        No active repository details found. Please analyze a repository.
-      </div>
-    );
-  }
-
-  const steps = analysisResult.roadmap.map((item) => ({
-    step: item.step_number,
-    title: item.title,
-    description: item.description,
-    files: []
-  }));
+  const steps = data.roadmap[activeRole];
   const roleCompleted = completedSteps[activeRole] ?? {};
 
   const toggleStep = (stepNumber: number) => {
+    soundManager.playClick();
     setCompletedSteps((prev) => {
       const activeRoleSteps = { ...prev[activeRole] };
       if (activeRoleSteps[stepNumber]) {
@@ -66,192 +56,184 @@ export function OnboardingRoadmapView() {
     });
   };
 
-  // Find the first uncompleted step (which represents the "Current" state)
-  const getStepState = (stepNumber: number) => {
-    if (roleCompleted[stepNumber]) return "completed";
-    
-    // Check if it's the current active step (first uncompleted step)
-    const firstUncompleted = steps.find((s) => !roleCompleted[s.step]);
-    if (firstUncompleted && firstUncompleted.step === stepNumber) return "current";
-    
-    // If all are completed, no step is current
-    return "upcoming";
-  };
-
-  const totalStepsCount = steps.length;
   const completedCount = Object.keys(roleCompleted).length;
-  const progressPercent = Math.round((completedCount / totalStepsCount) * 100);
+  const progressPercent = steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto select-none">
+      
       {/* Title section */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Onboarding Roadmap
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          AI-generated path showing critical steps to understand the repository based on your developer role.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-heading font-black tracking-tight text-foreground sm:text-3xl">
+            Contribution Roadmap
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Complete the interactive timeline quest stages to onboard onto the codebase.
+          </p>
+        </div>
+
+        {/* Progress tracker HUD */}
+        <div className="flex flex-col gap-1.5 w-full sm:w-48 font-mono text-xs">
+          <div className="flex justify-between items-center text-[10px]">
+            <span className="text-muted-foreground uppercase">Quest Progress</span>
+            <span className="text-primary font-bold">{progressPercent}%</span>
+          </div>
+          <div className="h-1.5 w-full bg-secondary/15 rounded-full overflow-hidden border border-border/20">
+            <motion.div
+              className="h-full bg-[linear-gradient(90deg,#7C5CFF,#00FFC6)]"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Role Selection Tabs */}
+      {/* Role filter buttons */}
       <div className="flex flex-wrap gap-1.5 border-b border-border/40 pb-4">
         {DEVELOPER_ROLES.map((role) => {
           const isSelected = activeRole === role.value;
-
           return (
             <button
               key={role.value}
-              onClick={() => setActiveRole(role.value)}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+              onClick={() => {
+                soundManager.playClick();
+                setActiveRole(role.value as DeveloperRole);
+              }}
+              onMouseEnter={() => soundManager.playHover()}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-heading font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                 isSelected
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  ? "bg-primary/20 text-[#00FFC6] border border-primary/45 glow-sm"
+                  : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
               }`}
             >
-              <Map className="h-3.5 w-3.5" />
               <span>{role.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Overall Progress Panel */}
-      <Card className="glass border-border/40 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              Onboarding Progress
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Completed {completedCount} of {totalStepsCount} recommended learning steps
-            </p>
-          </div>
-          <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-            <div className="h-2 flex-1 bg-secondary/50 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" as const }}
-                className="h-full bg-primary rounded-full"
-              />
-            </div>
-            <span className="font-mono text-xs font-bold text-foreground w-8 text-right">
-              {progressPercent}%
-            </span>
-          </div>
-        </div>
-      </Card>
-
-      {/* Timeline Steps layout */}
+      {/* Interconnected Quest Timeline Map */}
       <motion.div
-        key={activeRole}
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative border-l border-border/40 ml-4 pl-6 space-y-6 py-2"
+        className="space-y-6 relative"
       >
-        <AnimatePresence mode="popLayout">
-          {steps.map((stepItem) => {
-            const stepState = getStepState(stepItem.step);
-            const isCompleted = stepState === "completed";
-            const isCurrent = stepState === "current";
+        {/* Continuous background connection line */}
+        <div className="absolute left-[31px] top-6 bottom-6 w-[2px] bg-border/40" />
 
-            return (
-              <motion.div
-                key={stepItem.step}
-                variants={itemVariants}
-                className="relative"
+        {steps.map((step, idx) => {
+          const isCompleted = !!roleCompleted[step.step];
+          // Previous steps must be checked to unlock the current step
+          const isLocked = idx > 0 && !roleCompleted[steps[idx - 1].step];
+          const tierName = GAME_TIERS[idx % GAME_TIERS.length];
+
+          return (
+            <motion.div
+              key={step.step}
+              variants={itemVariants}
+              className={`flex items-start gap-4 relative group transition-all duration-300 ${
+                isLocked ? "opacity-45" : ""
+              }`}
+            >
+              {/* Stepper node checkpoint */}
+              <div 
+                onClick={() => {
+                  if (!isLocked) toggleStep(step.step);
+                }}
+                className={`relative z-10 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border cursor-pointer transition-all duration-300 ${
+                  isCompleted
+                    ? "bg-[#00FFC6]/15 border-[#00FFC6] text-[#00FFC6] glow-accent"
+                    : isLocked
+                    ? "bg-muted border-border text-muted-foreground/40 cursor-not-allowed"
+                    : "bg-secondary/15 border-secondary/40 text-secondary hover:border-primary"
+                }`}
+                onMouseEnter={() => {
+                  if (!isLocked) soundManager.playHover();
+                }}
               >
-                {/* Visual Timeline Marker Node */}
-                <div
-                  onClick={() => toggleStep(stepItem.step)}
-                  className={`absolute -left-[37px] top-4 flex h-6.5 w-6.5 items-center justify-center rounded-full border transition-all duration-200 cursor-pointer ${
-                    isCompleted
-                      ? "bg-emerald-500 border-emerald-500 text-white hover:brightness-110"
-                      : isCurrent
-                      ? "bg-primary border-primary text-white shadow-[0_0_12px_var(--color-primary)/30] animate-pulse"
-                      : "bg-background border-border text-muted-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {isCompleted ? (
-                    <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  ) : (
-                    <span className="text-[10px] font-bold font-mono">{stepItem.step}</span>
-                  )}
-                </div>
+                {isCompleted ? (
+                  <Check className="h-4 w-4 animate-[bounce_1s_infinite]" />
+                ) : isLocked ? (
+                  <Lock className="h-3.5 w-3.5" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )}
+              </div>
 
-                {/* Step card container */}
-                <Card
-                  onClick={() => {
-                    // Clicking the card toggles it to Completed if not active
-                    if (isCurrent || isCompleted) toggleStep(stepItem.step);
-                  }}
-                  className={`glass border transition-all duration-200 hover:glow-sm cursor-pointer ${
-                    isCompleted
-                      ? "border-emerald-500/20 bg-emerald-500/[2%]"
-                      : isCurrent
-                      ? "border-primary/40 bg-primary/[2%]"
-                      : "border-border/30"
-                  }`}
+              {/* Quest Card Container */}
+              <div className="flex-1">
+                <Card 
+                  className={`glass border-border/40 overflow-hidden relative transition-all duration-300 ${
+                    !isLocked && "hover:glow hover:border-primary/40"
+                  } ${isLocked && "backdrop-blur-md bg-secondary/5 border-border/20"}`}
                 >
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={isCompleted ? "default" : isCurrent ? "secondary" : "outline"}
-                          className={`text-[9px] uppercase tracking-wider ${
-                            isCompleted ? "bg-emerald-500 hover:bg-emerald-500 text-white" : ""
-                          }`}
-                        >
-                          {stepState}
-                        </Badge>
+                  {/* Lock Blur Layer Overlay */}
+                  {isLocked && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/30 backdrop-blur-[2.5px] pointer-events-none">
+                      <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground uppercase bg-card/80 px-2 py-1 rounded border border-border/30">
+                        <Lock className="h-3 w-3" /> Locked: complete previous phase
                       </div>
                     </div>
-                    <CardTitle className={`text-base font-bold mt-2 ${isCompleted ? "line-through text-muted-foreground/80" : "text-foreground"}`}>
-                      {stepItem.title}
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent className="p-4 pt-0 space-y-3.5">
-                    <p className={`text-xs sm:text-sm leading-relaxed ${isCompleted ? "text-muted-foreground/70" : "text-muted-foreground"}`}>
-                      {stepItem.description}
-                    </p>
+                  )}
 
-                    {stepItem.files && stepItem.files.length > 0 && (
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1">
-                          <FileCode className="h-3.5 w-3.5" />
-                          Recommended Files to Read
+                  <div className="p-5 flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[9px] text-[#00FFC6] bg-[#00FFC6]/10 px-1.5 py-0.5 rounded border border-[#00FFC6]/20">
+                          STAGE {step.step}
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {stepItem.files.map((file) => (
-                            <Badge
+                        <span className="font-heading text-[10px] font-black uppercase tracking-wider text-primary">
+                          {tierName} Node
+                        </span>
+                      </div>
+                      <h3 className={`text-base font-heading font-bold ${isCompleted ? 'line-through text-muted-foreground/60' : 'text-foreground'}`}>
+                        {step.title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground/80 leading-relaxed max-w-2xl font-sans">
+                        {step.description}
+                      </p>
+
+                      {/* Associated Files mapping badges */}
+                      {step.files && step.files.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-2">
+                          {step.files.map((file) => (
+                            <div 
                               key={file}
-                              variant="outline"
-                              className="font-mono text-[10px] bg-secondary/20 border-border/40 hover:bg-secondary/40 text-foreground"
+                              className="flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground/75 bg-secondary/35 border border-border/50 px-2 py-1 rounded-lg hover:text-foreground cursor-pointer transition-colors"
                             >
+                              <FileCode className="h-3 w-3 text-secondary" />
                               {file}
-                            </Badge>
+                            </div>
                           ))}
                         </div>
-                      </div>
+                      )}
+                    </div>
+
+                    {/* Quest Button */}
+                    {!isLocked && (
+                      <button
+                        onClick={() => toggleStep(step.step)}
+                        className={`shrink-0 flex items-center gap-1.5 font-heading font-black uppercase tracking-wider text-[10px] px-4 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
+                          isCompleted
+                            ? "bg-[#00FFC6]/10 border-[#00FFC6]/30 text-[#00FFC6]"
+                            : "bg-primary border-primary text-white hover:brightness-110 active:scale-95"
+                        }`}
+                      >
+                        {isCompleted ? "COMPLETED" : "MARK STAGE COMPLETED"}
+                      </button>
                     )}
-                  </CardContent>
+                  </div>
                 </Card>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              </div>
+
+            </motion.div>
+          );
+        })}
       </motion.div>
 
-      {/* Info Tip */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-border/30 bg-secondary/25 p-4 text-xs text-muted-foreground">
-        <AlertCircle className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-        <p className="leading-relaxed">
-          Click on any timeline step number or card to mark it as completed and update your onboarding progress. Your checkmarks are persisted locally in memory.
-        </p>
-      </div>
     </div>
   );
 }

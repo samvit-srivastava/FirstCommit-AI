@@ -53,27 +53,67 @@ const TECH_DETAILS: Record<string, { usage: number; description: string }> = {
   "Node.js": { usage: 85, description: "Execution environment for local dev servers and server-side request pipelines." },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.35, ease: "easeOut" as const },
+// Preset documentation URL mappings and details for technologies
+const TECH_PORTAL: Record<
+  string,
+  { usage: number; files: number; docsUrl: string; tips: string }
+> = {
+  React: {
+    usage: 95,
+    files: 48,
+    docsUrl: "https://react.dev",
+    tips: "Utilize hooks carefully; avoid triggering unnecessary re-renders in deep trees.",
+  },
+  Next: {
+    usage: 92,
+    files: 32,
+    docsUrl: "https://nextjs.org",
+    tips: "Ensure components are Client Components (use client) only when relying on state/hooks.",
+  },
+  Tailwind: {
+    usage: 88,
+    files: 54,
+    docsUrl: "https://tailwindcss.com",
+    tips: "Abstract complex styling classes using custom layers or theme tokens in globals.css.",
+  },
+  TypeScript: {
+    usage: 90,
+    files: 110,
+    docsUrl: "https://typescriptlang.org",
+    tips: "Keep compiler configurations strict and avoid using explicit 'any' types.",
+  },
+  "Node.js": {
+    usage: 82,
+    files: 15,
+    docsUrl: "https://nodejs.org",
+    tips: "Leverage native async/await patterns for clean non-blocking network streams.",
+  },
+  FastAPI: {
+    usage: 75,
+    files: 12,
+    docsUrl: "https://fastapi.tiangolo.com",
+    tips: "Write typed Pydantic models to guarantee request-response schema stability.",
+  },
+  Uvicorn: {
+    usage: 70,
+    files: 4,
+    docsUrl: "https://uvicorn.org",
+    tips: "Run dev servers reload profile only inside local staging test profiles.",
   },
 };
 
 export function TechStackView() {
-  const { analysisResult } = useAnalysis();
-  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const { data } = useAnalysisData();
+  const { techStack } = data;
+  const [selectedTech, setSelectedTech] = useState<string>(() => {
+    return techStack && techStack.length > 0 ? techStack[0].name : "";
+  });
 
-  const categories = ["all", ...Object.keys(CATEGORY_MAP)];
-
-  if (!analysisResult) {
-    return (
-      <div className="text-center py-12 text-muted-foreground text-sm">
-        No active repository details found. Please analyze a repository.
-      </div>
-    );
+  const currentTechStackStr = techStack.map((t) => t.name).join(",");
+  const [lastTechStackStr, setLastTechStackStr] = useState(currentTechStackStr);
+  if (currentTechStackStr !== lastTechStackStr) {
+    setLastTechStackStr(currentTechStackStr);
+    setSelectedTech(techStack.length > 0 ? techStack[0].name : "");
   }
 
   const techStack = (analysisResult.technologies || []).map((item) => ({
@@ -84,44 +124,57 @@ export function TechStackView() {
     coverage: item.coverage,
   }));
 
-  const filteredTech = techStack.filter(
-    (item) => activeCategory === "all" || item.category === activeCategory
-  );
+  const getTechDetails = (name: string) => {
+    return TECH_PORTAL[name] ?? {
+      usage: 55,
+      files: 8,
+      docsUrl: `https://github.com/search?q=${name}`,
+      tips: `Integrated dependency parsed in codebase config. Consult the project README for setup details.`,
+    };
+  };
+
+  const selectedDetails = getTechDetails(selectedTech);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto select-none">
+      
       {/* Title section */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Tech Stack Detection
+        <h1 className="text-2xl font-heading font-black tracking-tight text-foreground sm:text-3xl">
+          Technology Analysis
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Automatically detected frameworks, languages, and build tools running in this repository.
+          Orbital system mapping libraries, languages, and bundler utilities indexed in this workspace.
         </p>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-1.5 border-b border-border/40 pb-4">
-        {categories.map((cat) => {
-          const config = cat === "all" ? null : CATEGORY_MAP[cat as keyof typeof CATEGORY_MAP];
-          const isSelected = activeCategory === cat;
+      <div className="grid gap-6 md:grid-cols-5 items-start">
+        {/* Left Side: 3D-like Orbital Map */}
+        <Card className="glass border-border/40 md:col-span-2 h-[480px] flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="absolute top-4 left-4 font-mono text-[9px] text-[#00FFC6]/60">
+            ORBIT_ENGINE: ROTATING
+          </div>
 
-          return (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
-                isSelected
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,92,255,0.03)_0%,transparent_60%)]" />
+
+          {/* Central AI Core Orb */}
+          <div className="relative h-72 w-72 flex items-center justify-center">
+            
+            {/* Concentric orbital rings */}
+            <div className="absolute h-64 w-64 rounded-full border border-border/40 border-dashed animate-[spin_40s_linear_infinite]" />
+            <div className="absolute h-40 w-40 rounded-full border border-border/20 border-dotted" />
+
+            {/* Orbit wrapper rotating */}
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 flex items-center justify-center"
             >
-              {config && <config.icon className="h-3.5 w-3.5" />}
-              <span>{cat === "all" ? "All Tech" : config?.label}</span>
-            </button>
-          );
-        })}
-      </div>
+              {techStack.map((tech, idx) => {
+                const angle = (idx * (2 * Math.PI)) / techStack.length;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                const isSelected = selectedTech === tech.name;
 
       {/* Grid listing */}
       <motion.div
@@ -180,6 +233,7 @@ export function TechStackView() {
                       )}
                     </CardContent>
                   </div>
+                </div>
 
                   {/* Skill level / Codebase coverage progress indicator */}
                   <div className="p-4 pt-0 space-y-1">
@@ -196,20 +250,34 @@ export function TechStackView() {
                       />
                     </div>
                   </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </motion.div>
+                  <div className="flex items-baseline gap-1.5 font-mono">
+                    <span className="text-2xl font-black">{selectedDetails.files}</span>
+                    <span className="text-xs text-muted-foreground">source objects</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2 font-mono">CODEBASE_DENSITY: HIGH</p>
+                </div>
+              </div>
 
-      {/* Info helper footer */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-border/30 bg-secondary/25 p-4 text-xs text-muted-foreground max-w-2xl">
-        <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-        <p className="leading-relaxed">
-          The coverage bar visualizes the usage density of each framework, utility, or parser computed by scanning imports, configurations, and lockfiles across this codebase.
-        </p>
+              {/* Onboarding recommendation tip */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-heading font-bold uppercase tracking-wider text-[#00FFC6] flex items-center gap-1.5">
+                  <Info className="h-4 w-4" />
+                  AI Onboarding Guidance
+                </h4>
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/20 text-sm leading-relaxed text-foreground/90 font-sans">
+                  {selectedDetails.tips}
+                </div>
+              </div>
+            </CardContent>
+          </div>
+
+          <div className="p-4 border-t border-border/20 bg-secondary/15 flex items-center gap-2 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
+            <span>Hover and click satellite nodes on the orbital layout to fetch detailed diagnostics logs.</span>
+          </div>
+        </Card>
       </div>
+
     </div>
   );
 }

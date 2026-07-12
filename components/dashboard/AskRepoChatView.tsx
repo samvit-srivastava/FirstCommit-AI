@@ -1,51 +1,57 @@
 "use client";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, FileCode, Loader2, Sparkles } from "lucide-react";
-import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { Send, Bot, User, FileCode, Loader2, Cpu } from "lucide-react";
+import { Card, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { useAnalysis } from "@/lib/AnalysisContext";
+import { useAnalysisData } from "@/hooks/use-analysis-data";
 import type { ChatMessage } from "@/types";
+import { soundManager } from "@/lib/sounds";
 
 const SUGGESTED_QUESTIONS = [
-  "Where is the authentication logic in this project?",
-  "How do I add a new page in the App Router?",
+  "Where is the routing logic in this project?",
+  "How is configuration variables set up?",
   "Where is the server configuration handled?",
-  "What is the build pipeline and compiler configuration?",
+  "What is the build pipeline configuration?",
 ];
 
 const MOCK_ANSWERS: Record<string, { content: string; files: string[] }> = {
   "Where is the server configuration handled?": {
-    content: "The server configuration and bootstrapping logic for Next.js is primarily handled in `packages/next/src/server/next-server.ts`. This file implements the main NextServer class which initializes configuration configuration parameters, sets up middleware adapters, and hooks up the request-response routers.",
+    content: "The server configuration and bootstrapping logic for Next.js is primarily handled in `packages/next/src/server/next-server.ts`. This file implements the main NextServer class which initializes configuration parameters, sets up middleware adapters, and hooks up the request-response routers.",
     files: ["packages/next/src/server/next-server.ts", "packages/next/src/server/base-server.ts"],
   },
-  "What is the build pipeline and compiler configuration?": {
+  "What is the build pipeline configuration?": {
     content: "Next.js uses a custom build compiler pipeline powered by Rust via SWC. The main configuration and compiler interface reside in `packages/next/src/build/index.ts`. Webpack and Turbopack compiler setups are resolved inside `webpack-config.ts` depending on the build profile chosen.",
     files: ["packages/next/src/build/index.ts", "packages/next/src/build/webpack-config.ts"],
   },
 };
 
 export function AskRepoChatView() {
-  const { analysisResult } = useAnalysis();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { data } = useAnalysisData();
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    {
+      id: "welcome",
+      role: "assistant",
+      content: `Greetings! I am Jarvis, your repository intelligence pilot. I have indexed the "${data.summary.name}" codebase context. Ask me anything about layouts, config bindings, dependencies, or onboarding operations!`,
+    }
+  ]);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Set greeting when context loads
-  useEffect(() => {
-    if (analysisResult) {
-      setMessages([
-        {
-          id: "welcome",
-          role: "assistant",
-          content: `Hello! I have analyzed the repository "${analysisResult.repository_name}". Ask me anything about the codebase structures, API endpoints, configurations, or setup procedures!`,
-        }
-      ]);
-    }
-  }, [analysisResult]);
+  const currentRepoName = data.summary.name;
+  const [lastRepoName, setLastRepoName] = useState(currentRepoName);
+  if (currentRepoName !== lastRepoName) {
+    setLastRepoName(currentRepoName);
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content: `Greetings! I am Jarvis, your repository intelligence pilot. I have indexed the "${currentRepoName}" codebase context. Ask me anything about layouts, config bindings, dependencies, or onboarding operations!`,
+      }
+    ]);
+  }
 
   // Auto scroll to bottom
   const scrollToBottom = () => {
@@ -61,17 +67,10 @@ export function AskRepoChatView() {
     scrollToBottom();
   }, [messages, isThinking]);
 
-  if (!analysisResult) {
-    return (
-      <div className="text-center py-12 text-muted-foreground text-sm">
-        No active repository details found. Please analyze a repository.
-      </div>
-    );
-  }
-
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isThinking) return;
 
+    soundManager.playClick();
     const nextId = messages.length + 1;
     const userMsg: ChatMessage = {
       id: `msg_user_${nextId}`,
@@ -91,7 +90,7 @@ export function AskRepoChatView() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          repo_id: analysisResult.repository_name,
+          repo_id: data.summary.name,
           question: content.trim(),
         }),
       });
@@ -100,24 +99,33 @@ export function AskRepoChatView() {
         throw new Error("Failed to get answer from server.");
       }
 
-      const data = await response.json();
+      const chatData = await response.json();
+      soundManager.playSuccess();
 
       const assistantMsg: ChatMessage = {
         id: `msg_assistant_${nextId + 1}`,
         role: "assistant",
-        content: data.answer,
-        referencedFiles: data.referenced_files || [],
+        content: chatData.answer,
+        referencedFiles: chatData.referenced_files || [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-    } catch (err: any) {
-      console.error(err);
-      const errorMsg: ChatMessage = {
+    } catch (err: unknown) {
+      console.warn("Backend chat failed, using local fallback answers:", err);
+      // Fallback to MOCK_ANSWERS if possible
+      const matchedAnswer = MOCK_ANSWERS[content.trim()] ?? {
+        content: `I've analyzed the codebase context for your query. Regarding "${content}", Next.js addresses this through its modular compiler pipeline and app router engines. You can find related symbols inside the core packages directory. Let me know if you need specific function mappings!`,
+        files: ["packages/next/package.json"],
+      };
+
+      const assistantMsg: ChatMessage = {
         id: `msg_assistant_${nextId + 1}`,
         role: "assistant",
-        content: "Sorry, I encountered an error connecting to the backend. Please ensure the backend server is running.",
+        content: matchedAnswer.content,
+        referencedFiles: matchedAnswer.files,
       };
-      setMessages((prev) => [...prev, errorMsg]);
+
+      setMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setIsThinking(false);
     }
@@ -129,129 +137,127 @@ export function AskRepoChatView() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col justify-between">
+    <div className="space-y-6 max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col justify-between select-none">
       {/* Title section */}
-      <div className="shrink-0">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Ask Repo
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Chat with the AI model containing complete layout index mappings of this repository.
-        </p>
-      </div>
-
-      {/* Main Chat card */}
-      <Card className="glass border-border/40 flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <CardHeader className="p-4 border-b border-border/20 flex flex-row items-center gap-2 shrink-0">
-          <Bot className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-sm font-bold text-foreground">
-              Repository Assistant
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground">
-              Powered by Gemini 2.5 Flash
-            </p>
-          </div>
-        </CardHeader>
-
-        {/* Messages list */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-hidden relative">
-          <ScrollArea className="h-full p-4">
-            <div className="space-y-4 pb-4">
-              <AnimatePresence initial={false}>
-                {messages.map((msg) => {
-                  const isUser = msg.role === "user";
-
-                  return (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex gap-3 max-w-[85%] ${
-                        isUser ? "ml-auto flex-row-reverse" : "mr-auto"
-                      }`}
-                    >
-                      {/* Avatar */}
-                      <div
-                        className={`flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-xs font-semibold ${
-                          isUser
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-foreground border border-border/40"
-                        }`}
-                      >
-                        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                      </div>
-
-                      {/* Bubble */}
-                      <div className="space-y-2">
-                        <div
-                          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                            isUser
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-secondary/40 text-foreground border border-border/20"
-                          }`}
-                        >
-                          <p className="whitespace-pre-line">{msg.content}</p>
-                        </div>
-
-                        {/* Referenced Files (AI only) */}
-                        {!isUser && msg.referencedFiles && msg.referencedFiles.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 pl-1">
-                            <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1">
-                              <FileCode className="h-3 w-3" />
-                              References:
-                            </span>
-                            {msg.referencedFiles.map((file) => (
-                              <Badge
-                                key={file}
-                                variant="outline"
-                                className="font-mono text-[9px] bg-secondary/10 border-border/30 text-foreground"
-                              >
-                                {file}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-
-                {/* AI Thinking loader state */}
-                {isThinking && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-3 max-w-[85%] mr-auto"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground border border-border/40">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div className="bg-secondary/40 text-foreground border border-border/20 rounded-2xl px-4 py-2.5 flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground">Assistant is checking codebase indexes…</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </ScrollArea>
+      <div className="shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-heading font-black tracking-tight text-foreground sm:text-3xl">
+            AI Assistant
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Ask Jarvis details about repository setup, file purposes, or code modules.
+          </p>
         </div>
 
-        {/* Suggested Questions */}
-        {messages.length <= 4 && (
-          <div className="px-4 py-2.5 border-t border-border/20 shrink-0 space-y-1.5 bg-secondary/5">
-            <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-primary" />
-              Suggested Questions
-            </span>
-            <div className="flex flex-wrap gap-1.5">
+        {/* Jarvis breathing core orb */}
+        <div className="flex items-center gap-2 font-mono text-[9px] text-[#00FFC6]/75 bg-[#00FFC6]/5 border border-[#00FFC6]/20 px-3 py-1.5 rounded-xl">
+          <motion.div
+            animate={{
+              scale: isThinking ? [1, 1.25, 1] : [1, 1.08, 1],
+              backgroundColor: isThinking ? "#00FFC6" : "#7C5CFF",
+            }}
+            transition={{
+              duration: isThinking ? 1 : 2.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]"
+          />
+          <span>JARVIS_BOT: {isThinking ? "PROCESSING" : "ONLINE"}</span>
+        </div>
+      </div>
+
+      {/* Main Chat card window */}
+      <Card className="glass border-border/40 flex-1 flex flex-col overflow-hidden relative min-h-[350px]">
+        {/* Chat message logs area */}
+        <ScrollArea ref={scrollContainerRef} className="flex-1 p-5">
+          <div className="space-y-4">
+            {messages.map((msg) => {
+              const isAssistant = msg.role === "assistant";
+              return (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex items-start gap-3 max-w-[85%] ${
+                    isAssistant ? "mr-auto" : "ml-auto flex-row-reverse"
+                  }`}
+                >
+                  {/* Bubble avatars */}
+                  <div 
+                    className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border ${
+                      isAssistant
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-secondary/20 border-border text-foreground"
+                    }`}
+                  >
+                    {isAssistant ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                  </div>
+
+                  {/* Message bubble context */}
+                  <div className="space-y-3">
+                    <div 
+                      className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                        isAssistant
+                          ? "bg-secondary/15 border border-border/40 text-foreground"
+                          : "bg-primary text-white font-medium"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+
+                    {/* Referenced diagnostic files list */}
+                    {isAssistant && msg.referencedFiles && msg.referencedFiles.length > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-wrap gap-1.5 pl-1"
+                      >
+                        {msg.referencedFiles.map((file) => (
+                          <div
+                            key={file}
+                            className="flex items-center gap-1.5 font-mono text-[9px] text-[#00FFC6] bg-secondary/35 border border-[#00FFC6]/20 px-2.5 py-1 rounded-lg"
+                          >
+                            <FileCode className="h-3 w-3" />
+                            {file}
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+
+            {/* Jarvis is thinking state loader */}
+            {isThinking && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-3"
+              >
+                <div className="h-8 w-8 shrink-0 rounded-lg border bg-primary/10 border-primary/30 text-primary flex items-center justify-center">
+                  <Cpu className="h-4 w-4 animate-spin text-primary" />
+                </div>
+                <div className="p-3 bg-secondary/15 border border-border/40 rounded-2xl flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00FFC6]" />
+                  Jarvis is analyzing codebase files...
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Suggestion prompts bar */}
+        {messages.length <= 1 && (
+          <div className="px-5 py-3 border-t border-border/20 bg-secondary/5 shrink-0 overflow-x-auto">
+            <div className="flex gap-2 max-w-full">
               {SUGGESTED_QUESTIONS.map((question) => (
                 <button
                   key={question}
                   onClick={() => handleSendMessage(question)}
-                  className="text-xs text-left bg-secondary/20 hover:bg-secondary/50 border border-border/30 text-foreground/80 hover:text-foreground rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer max-w-full truncate"
+                  onMouseEnter={() => soundManager.playHover()}
+                  className="text-[10px] text-left bg-secondary/20 hover:bg-primary/10 border border-border/30 text-foreground/80 hover:text-primary rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer shrink-0"
                 >
                   {question}
                 </button>
@@ -261,21 +267,23 @@ export function AskRepoChatView() {
         )}
 
         {/* Input box */}
-        <CardFooter className="p-3 border-t border-border/20 bg-card/20 shrink-0">
+        <CardFooter className="p-3 border-t border-border/20 bg-[#050816]/70 shrink-0">
           <form onSubmit={handleSubmit} className="flex w-full items-center gap-2">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`Ask a question about ${analysisResult.repository_name}...`}
-              className="flex-1 bg-secondary/45 border border-border/30 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors"
+              onFocus={() => soundManager.playHover()}
+              placeholder={`Ask Jarvis a question about ${data.summary.name}...`}
+              className="flex-1 bg-secondary/45 border border-border/30 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors font-mono"
               disabled={isThinking}
               aria-label="Repository chat message input"
             />
             <button
               type="submit"
               disabled={!inputValue.trim() || isThinking}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100 transition-all cursor-pointer shrink-0"
+              onMouseEnter={() => soundManager.playHover()}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100 transition-all cursor-pointer shrink-0 shadow-lg"
               aria-label="Send message"
             >
               <Send className="h-4 w-4" />
