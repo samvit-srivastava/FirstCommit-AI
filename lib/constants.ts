@@ -1,4 +1,4 @@
-import { BookOpen, Code2, FolderTree, Map, MessageSquare } from "lucide-react";
+import { BookOpen, Code2, FolderTree, Map } from "lucide-react";
 
 export const APP_NAME = "FirstCommit AI";
 export const APP_DESCRIPTION =
@@ -28,12 +28,6 @@ export const FEATURES = [
     description:
       "Receive a personalized step-by-step learning path based on your developer role.",
     icon: Map,
-  },
-  {
-    title: "Ask Repo",
-    description:
-      "Chat with AI that understands the repository and answers your questions with file references.",
-    icon: MessageSquare,
   },
 ] as const;
 

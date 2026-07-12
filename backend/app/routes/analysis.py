@@ -2,8 +2,6 @@ from fastapi import APIRouter, HTTPException
 from app.schemas.analysis import (
     AnalyzeRequest,
     AnalyzeResponse,
-    ChatRequest,
-    ChatResponse,
     TechStackItem,
     FolderExplanationItem,
     RoadmapStep,
@@ -148,26 +146,6 @@ async def analyze_repository(payload: AnalyzeRequest):
         forks=github_meta["forks"],
         watchers=github_meta["watchers"],
         updated_at=github_meta["updated_at"]
-    )
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_repository(payload: ChatRequest):
-    """
-    Answers questions about a repository using RAG.
-    Returns realistic mock data for this phase of the hackathon demo.
-    """
-    # TODO: Implement ChromaDB and Gemini RAG search in future phases.
-    return ChatResponse(
-        answer=(
-            f"To run the backend development server for the repository (ID: {payload.repo_id}), "
-            "navigate to the 'backend/' directory, install the required libraries with 'pip install -r requirements.txt', "
-            "and start the application using the command: 'uvicorn app.main:app --reload'."
-        ),
-        referenced_files=[
-            "backend/requirements.txt",
-            "backend/app/main.py",
-            "backend/app/routes/analysis.py"
-        ]
     )
 
 @router.get("/graph", response_model=GraphResponse)

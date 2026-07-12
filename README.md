@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Future Scope
+
+These planned capabilities are designed to build on top of the existing **Repository Knowledge Engine (RKE)**:
+
+* **AI Repository Assistant**: Conversational repository Q&A system.
+* **Explain Code**: Interactive code explanation in natural language.
+* **Semantic Search**: Vector database integrations using embeddings.
+* **Refactoring Suggestions**: Automated code improvements.
+* **Security Review**: Automated codebase vulnerability scanning.
+* **Pull Request Review**: AI-powered code reviews.
+* **Test Generation**: Automated test suite generation.
+* **Multi-Agent Repository Analysis**: Concurrent autonomous agent scans.
+* **Intelligent Code Migration**: Automated framework migrations.
+* **Automatic Documentation Generation**: Dynamic developer onboarding handbooks.

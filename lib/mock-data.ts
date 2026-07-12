@@ -1,4 +1,4 @@
-import type { AnalysisResult, ChatMessage, OverviewStat, ActivityItem } from "@/types";
+import type { AnalysisResult, OverviewStat, ActivityItem } from "@/types";
 
 export const mockAnalysis: AnalysisResult = {
   summary: {
@@ -278,40 +278,6 @@ export const mockAnalysis: AnalysisResult = {
     ],
   },
 };
-
-export const mockChatMessages: ChatMessage[] = [
-  {
-    id: "1",
-    role: "user",
-    content: "Where is the authentication logic in this project?",
-  },
-  {
-    id: "2",
-    role: "assistant",
-    content:
-      "Next.js itself doesn't include built-in authentication. However, the framework provides several hooks for implementing auth:\n\n1. **Middleware** (`packages/next/src/server/web/`) handles request interception, which is commonly used for auth checks.\n2. **Server Components** can verify sessions server-side before rendering.\n3. **Route Handlers** in the App Router can be used to create auth API endpoints.\n\nFor actual auth implementation, Next.js recommends using libraries like NextAuth.js (Auth.js), which integrate seamlessly with the App Router.",
-    referencedFiles: [
-      "packages/next/src/server/web/adapter.ts",
-      "packages/next/src/server/app-render/action-handler.ts",
-    ],
-  },
-  {
-    id: "3",
-    role: "user",
-    content: "How do I add a new page in the App Router?",
-  },
-  {
-    id: "4",
-    role: "assistant",
-    content:
-      "In Next.js App Router, pages are created using the file-system convention:\n\n1. Create a new directory under `app/` for your route (e.g., `app/about/`).\n2. Add a `page.tsx` file inside that directory — this becomes the route's UI.\n3. Optionally add `layout.tsx` for shared layout, `loading.tsx` for loading states, and `error.tsx` for error boundaries.\n\nFor example, creating `app/dashboard/settings/page.tsx` automatically creates the route `/dashboard/settings`.\n\nDynamic routes use bracket syntax: `app/blog/[slug]/page.tsx` creates `/blog/:slug`.",
-    referencedFiles: [
-      "packages/next/src/server/app-render/app-render.tsx",
-      "packages/next/src/build/webpack/loaders/next-app-loader/index.ts",
-    ],
-  },
-];
-
 export const mockOverviewStats: OverviewStat[] = [
   {
     label: "Technologies",
@@ -362,8 +328,8 @@ export const mockRecentActivity: ActivityItem[] = [
   },
   {
     id: "a5",
-    title: "RAG index built",
-    description: "Repository embeddings generated for AI chat",
+    title: "Graph index built",
+    description: "Repository relationships mapped for Graph Explorer",
     timestamp: "30 seconds ago",
   },
   {

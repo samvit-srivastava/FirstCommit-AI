@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CustomCursor } from "@/components/ui/CustomCursor";
 import { CyberBackground } from "@/components/ui/CyberBackground";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const inter = Inter({
@@ -23,7 +24,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "FirstCommit AI — Understand Any Repository in Minutes",
   description:
-    "AI Developer Onboarding Assistant. Paste a GitHub URL and get an instant project summary, tech stack breakdown, folder explanations, personalized roadmap, and repository-aware chat.",
+    "AI Developer Onboarding Assistant. Paste a GitHub URL and get an instant project summary, tech stack breakdown, folder explanations, personalized roadmap, and interactive relationships graph.",
   keywords: [
     "developer onboarding",
     "GitHub",
@@ -44,7 +45,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
+      className={`${plusJakartaSans.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
     >
       <body className="min-h-screen bg-background text-foreground relative">
         <ThemeProvider
